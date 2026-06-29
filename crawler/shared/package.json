@@ -1,0 +1,9 @@
+{
+  "name": "crawler-shared",
+  "version": "1.0.0",
+  "description": "多平台爬虫共享模块 - 浏览器启动/反检测/滚动/统一输出",
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

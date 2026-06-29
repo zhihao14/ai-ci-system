@@ -1,0 +1,12 @@
+{
+  "name": "tiktok-crawler",
+  "version": "1.0.0",
+  "description": "TikTok 账号视频爬虫 - Playwright 拦截 API + DOM 兜底",
+  "type": "module",
+  "scripts": {
+    "crawl": "node crawl_tiktok.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "youtube-crawler",
+  "version": "1.0.0",
+  "description": "YouTube 频道视频爬虫 - 从 ytInitialData 提取 + API 拦截",
+  "type": "module",
+  "scripts": {
+    "crawl": "node crawl_youtube.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

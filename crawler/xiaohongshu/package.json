@@ -1,0 +1,12 @@
+{
+  "name": "xiaohongshu-crawler",
+  "version": "1.0.0",
+  "description": "小红书内容爬虫 - Playwright 拦截 API + DOM 兜底",
+  "type": "module",
+  "scripts": {
+    "crawl": "node crawl_xiaohongshu.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

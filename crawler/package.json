@@ -1,0 +1,12 @@
+{
+  "name": "ci-crawler",
+  "version": "1.0.0",
+  "description": "Playwright 竞争对手网站爬取脚本 - 输出页面标题与正文",
+  "type": "module",
+  "scripts": {
+    "crawl": "node crawl.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

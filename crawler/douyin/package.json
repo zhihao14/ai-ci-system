@@ -1,0 +1,13 @@
+{
+  "name": "douyin-crawler",
+  "version": "1.0.0",
+  "description": "抖音视频爬虫 - Playwright 抓取账号视频列表",
+  "type": "module",
+  "scripts": {
+    "crawl": "node crawl_douyin.js",
+    "crawl:headed": "node crawl_douyin.js --headed"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

@@ -1,0 +1,87 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  # ============================================================
+  # CI 门禁: 仅在 CI 成功时继续部署
+  # ============================================================
+  ci-gate:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || (github.event.workflow_run.conclusion == 'success') }}
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+    steps:
+      - name: CI Gate
+        id: check
+        run: |
+          echo "CI passed, proceeding to deploy."
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+
+  # ============================================================
+  # Backend → Railway (自动部署)
+  # ============================================================
+  deploy-backend:
+    runs-on: ubuntu-latest
+    needs: ci-gate
+    if: needs.ci-gate.outputs.should_deploy == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+        run: |
+          railway up --service "$RAILWAY_SERVICE_ID"
+          echo "Backend deployed to Railway."
+
+  # ============================================================
+  # Frontend → Vercel (自动部署)
+  # ============================================================
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    needs: ci-gate
+    if: needs.ci-gate.outputs.should_deploy == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Pull Vercel env
+        run: vercel pull --yes --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
