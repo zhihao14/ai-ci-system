@@ -23,6 +23,10 @@ def get_supabase() -> Client:
     return _supabase
 
 
+# ============================================================
+# 竞争对手 & 报告
+# ============================================================
+
 def upsert_competitor(name: str, url: str) -> str:
     """插入或更新竞争对手, 返回 competitor_id"""
     sb = get_supabase()
@@ -59,3 +63,53 @@ def get_report(report_id: str) -> dict | None:
     sb = get_supabase()
     res = sb.table("intelligence_reports").select("*").eq("id", report_id).execute()
     return res.data[0] if res.data else None
+
+
+# ============================================================
+# AI 配置 CRUD
+# ============================================================
+
+def list_ai_configs() -> list:
+    """列出所有 AI 配置, 按 priority 升序"""
+    sb = get_supabase()
+    res = (
+        sb.table("ai_config")
+        .select("*")
+        .order("priority", desc=False)
+        .execute()
+    )
+    return res.data
+
+
+def get_active_ai_configs() -> list:
+    """获取所有启用的 AI 配置, 按 priority 升序"""
+    sb = get_supabase()
+    res = (
+        sb.table("ai_config")
+        .select("*")
+        .eq("is_active", True)
+        .order("priority", desc=False)
+        .execute()
+    )
+    return res.data
+
+
+def insert_ai_config(config: dict) -> dict:
+    """新增 AI 配置, 返回完整记录"""
+    sb = get_supabase()
+    row = sb.table("ai_config").insert(config).execute()
+    return row.data[0]
+
+
+def update_ai_config(config_id: str, updates: dict) -> dict | None:
+    """更新 AI 配置, 返回更新后的记录"""
+    sb = get_supabase()
+    res = sb.table("ai_config").update(updates).eq("id", config_id).execute()
+    return res.data[0] if res.data else None
+
+
+def delete_ai_config(config_id: str) -> bool:
+    """删除 AI 配置"""
+    sb = get_supabase()
+    res = sb.table("ai_config").delete().eq("id", config_id).execute()
+    return len(res.data) > 0

@@ -33,11 +33,30 @@ create table if not exists intelligence_reports (
 create index if not exists idx_reports_competitor on intelligence_reports(competitor_id);
 create index if not exists idx_reports_created    on intelligence_reports(created_at desc);
 
--- 4) 行级安全 (RLS): 演示阶段开放读写, 生产环境请按业务收紧
+-- 4) AI 配置表: 前台管理 AI 供应商密钥与模型
+create table if not exists ai_config (
+  id          uuid primary key default gen_random_uuid(),
+  provider    text not null,                 -- 'deepseek' | 'claude' | 'glm' | 'openai'
+  label       text not null,                 -- 显示名称
+  api_key     text not null,                 -- API 密钥
+  base_url    text,                          -- 接口地址(可空, 有默认)
+  model       text not null,                 -- 模型名
+  is_active   boolean default true,         -- 是否启用
+  priority    integer default 0,             -- 优先级(数字越小越优先)
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+create index if not exists idx_ai_config_active on ai_config(is_active, priority);
+
+-- 5) 行级安全 (RLS): 演示阶段开放读写, 生产环境请按业务收紧
 alter table competitors          enable row level security;
 alter table intelligence_reports  enable row level security;
+alter table ai_config            enable row level security;
 
 drop policy if exists "public access" on competitors;
 drop policy if exists "public access" on intelligence_reports;
+drop policy if exists "public access" on ai_config;
 create policy "public access" on competitors          for all using (true) with check (true);
 create policy "public access" on intelligence_reports for all using (true) with check (true);
+create policy "public access" on ai_config            for all using (true) with check (true);

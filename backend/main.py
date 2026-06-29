@@ -3,6 +3,7 @@
 职责:
 1. 接收前端分析请求 -> 调用 Node 爬虫 -> 调用 AI -> 存 Supabase -> 返回报告
 2. 提供报告列表与详情查询接口
+3. 提供 AI 配置 CRUD 接口 (前台管理)
 """
 import os
 import json
@@ -13,8 +14,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from models import AnalyzeRequest, IntelligenceReport
-from db import upsert_competitor, insert_report, list_reports, get_report
+from models import (
+    AnalyzeRequest, IntelligenceReport,
+    AIConfigCreate, AIConfigUpdate, AIConfigResponse,
+)
+from db import (
+    upsert_competitor, insert_report, list_reports, get_report,
+    list_ai_configs, get_active_ai_configs, insert_ai_config,
+    update_ai_config, delete_ai_config,
+)
 from ai_service import analyze
 
 # 加载环境变量
@@ -50,16 +58,31 @@ def run_crawler(url: str) -> dict:
         return {"url": url, "title": "", "content": "", "error": str(e)}
 
 
+def _mask_key(key: str) -> str:
+    """API Key 脱敏: 只显示前4位和后4位"""
+    if not key or len(key) <= 8:
+        return "****"
+    return f"{key[:4]}...{key[-4:]}"
+
+
+# ============================================================
+# 健康检查
+# ============================================================
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "crawler": os.path.exists(CRAWLER_SCRIPT)}
 
 
+# ============================================================
+# 竞争对手分析
+# ============================================================
+
 @app.post("/api/analyze", response_model=IntelligenceReport)
 def analyze_competitor(req: AnalyzeRequest):
-    url = str(req.url)
+    url = req.url.strip()
     # 名称缺省时用域名
-    name = req.name or urlparse(url).netloc
+    name = req.name or urlparse(url).netloc or url
 
     # 1) 爬取页面
     crawled = run_crawler(url)
@@ -137,3 +160,79 @@ def report_detail(report_id: str):
         ai_provider=row.get("ai_provider"),
         created_at=row.get("created_at"),
     )
+
+
+# ============================================================
+# AI 配置 CRUD (前台管理)
+# ============================================================
+
+@app.get("/api/config", response_model=list[AIConfigResponse])
+def get_configs():
+    """列出所有 AI 配置 (api_key 脱敏)"""
+    configs = list_ai_configs()
+    return [
+        AIConfigResponse(
+            id=c["id"],
+            provider=c["provider"],
+            label=c["label"],
+            api_key=_mask_key(c["api_key"]),
+            base_url=c.get("base_url"),
+            model=c["model"],
+            is_active=c["is_active"],
+            priority=c["priority"],
+            created_at=c.get("created_at"),
+            updated_at=c.get("updated_at"),
+        )
+        for c in configs
+    ]
+
+
+@app.post("/api/config", response_model=AIConfigResponse)
+def create_config(cfg: AIConfigCreate):
+    """新增 AI 配置"""
+    data = cfg.model_dump()
+    saved = insert_ai_config(data)
+    return AIConfigResponse(
+        id=saved["id"],
+        provider=saved["provider"],
+        label=saved["label"],
+        api_key=_mask_key(saved["api_key"]),
+        base_url=saved.get("base_url"),
+        model=saved["model"],
+        is_active=saved["is_active"],
+        priority=saved["priority"],
+        created_at=saved.get("created_at"),
+        updated_at=saved.get("updated_at"),
+    )
+
+
+@app.put("/api/config/{config_id}", response_model=AIConfigResponse)
+def update_config(config_id: str, cfg: AIConfigUpdate):
+    """更新 AI 配置 (只更新非 None 字段)"""
+    updates = cfg.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="没有需要更新的字段")
+    saved = update_ai_config(config_id, updates)
+    if not saved:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    return AIConfigResponse(
+        id=saved["id"],
+        provider=saved["provider"],
+        label=saved["label"],
+        api_key=_mask_key(saved["api_key"]),
+        base_url=saved.get("base_url"),
+        model=saved["model"],
+        is_active=saved["is_active"],
+        priority=saved["priority"],
+        created_at=saved.get("created_at"),
+        updated_at=saved.get("updated_at"),
+    )
+
+
+@app.delete("/api/config/{config_id}")
+def remove_config(config_id: str):
+    """删除 AI 配置"""
+    ok = delete_ai_config(config_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    return {"status": "deleted"}

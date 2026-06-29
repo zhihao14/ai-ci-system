@@ -77,11 +77,19 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">AI 竞争情报系统</h1>
-        <p className="text-sm text-slate-500">
-          输入竞争对手官网地址, 自动爬取并由 AI 生成结构化情报报告
-        </p>
+      <header className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">AI 竞争情报系统</h1>
+          <p className="text-sm text-slate-500">
+            粘贴主页分享链接, 自动爬取并由 AI 生成结构化情报报告
+          </p>
+        </div>
+        <a
+          href="/settings"
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+        >
+          AI 配置
+        </a>
       </header>
 
       {/* 提交表单 */}
@@ -90,11 +98,11 @@ export default function Home() {
         className="mb-8 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-[1fr_220px_auto]"
       >
         <input
-          type="url"
+          type="text"
           required
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://competitor.com"
+          placeholder="粘贴主页分享链接或网站 URL"
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand"
         />
         <input
