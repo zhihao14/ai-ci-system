@@ -166,44 +166,52 @@ def report_detail(report_id: str):
 # AI 配置 CRUD (前台管理)
 # ============================================================
 
-@app.get("/api/config", response_model=list[AIConfigResponse])
+@app.get("/api/config")
 def get_configs():
     """列出所有 AI 配置 (api_key 脱敏)"""
-    configs = list_ai_configs()
-    return [
-        AIConfigResponse(
-            id=c["id"],
-            provider=c["provider"],
-            label=c["label"],
-            api_key=_mask_key(c["api_key"]),
-            base_url=c.get("base_url"),
-            model=c["model"],
-            is_active=c["is_active"],
-            priority=c["priority"],
-            created_at=c.get("created_at"),
-            updated_at=c.get("updated_at"),
-        )
-        for c in configs
-    ]
+    try:
+        configs = list_ai_configs()
+        return [
+            {
+                "id": c["id"],
+                "provider": c["provider"],
+                "label": c["label"],
+                "api_key": _mask_key(c["api_key"]),
+                "base_url": c.get("base_url"),
+                "model": c["model"],
+                "is_active": c["is_active"],
+                "priority": c["priority"],
+                "created_at": c.get("created_at"),
+                "updated_at": c.get("updated_at"),
+            }
+            for c in configs
+        ]
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "trace": traceback.format_exc()}
 
 
-@app.post("/api/config", response_model=AIConfigResponse)
+@app.post("/api/config")
 def create_config(cfg: AIConfigCreate):
     """新增 AI 配置"""
-    data = cfg.model_dump()
-    saved = insert_ai_config(data)
-    return AIConfigResponse(
-        id=saved["id"],
-        provider=saved["provider"],
-        label=saved["label"],
-        api_key=_mask_key(saved["api_key"]),
-        base_url=saved.get("base_url"),
-        model=saved["model"],
-        is_active=saved["is_active"],
-        priority=saved["priority"],
-        created_at=saved.get("created_at"),
-        updated_at=saved.get("updated_at"),
-    )
+    try:
+        data = cfg.model_dump()
+        saved = insert_ai_config(data)
+        return {
+            "id": saved["id"],
+            "provider": saved["provider"],
+            "label": saved["label"],
+            "api_key": _mask_key(saved["api_key"]),
+            "base_url": saved.get("base_url"),
+            "model": saved["model"],
+            "is_active": saved["is_active"],
+            "priority": saved["priority"],
+            "created_at": saved.get("created_at"),
+            "updated_at": saved.get("updated_at"),
+        }
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "trace": traceback.format_exc()}
 
 
 @app.put("/api/config/{config_id}", response_model=AIConfigResponse)
