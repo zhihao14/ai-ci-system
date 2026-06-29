@@ -26,6 +26,7 @@ async function crawlDouyinShare(shareUrl) {
   const resp = await fetch(shareUrl, {
     redirect: "follow",
     headers: { "User-Agent": UA },
+    signal: AbortSignal.timeout(15000),
   });
   const finalUrl = resp.url;
 
@@ -39,7 +40,7 @@ async function crawlDouyinShare(shareUrl) {
   // 3. 调用抖音公开 API 获取用户信息
   const apiResp = await fetch(
     `https://www.iesdouyin.com/web/api/v2/user/info/?sec_uid=${secUid}`,
-    { headers: { "User-Agent": UA } }
+    { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15000) }
   );
   const data = await apiResp.json();
 

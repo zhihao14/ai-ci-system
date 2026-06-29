@@ -33,7 +33,10 @@ app = FastAPI(title="AI 竞争情报系统 - 竞争对手分析模块")
 # 允许 Next.js 前端跨域访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://ai-ci-system.vercel.app",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -103,6 +106,8 @@ def analyze_competitor(req: AnalyzeRequest):
 
     # 2) AI 情报分析
     ai = analyze(title, content)
+    if not ai or ai.get("ai_provider") == "none":
+        raise HTTPException(status_code=503, detail=ai.get("summary", "AI 分析失败, 请检查 AI 配置"))
 
     # 3) 落库: 先 upsert 竞争对手, 再插入报告
     competitor_id = upsert_competitor(name, url)

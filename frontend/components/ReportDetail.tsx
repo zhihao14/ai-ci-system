@@ -25,7 +25,7 @@ export default function ReportDetail({ report }: { report: Report }) {
     <div className="space-y-6">
       {/* 头部 */}
       <div>
-        <h2 className="text-xl font-bold text-slate-900">{report.title}</h2>
+        <h2 className="text-xl font-bold text-slate-900">{report.title || report.url}</h2>
         <a
           href={report.url}
           target="_blank"

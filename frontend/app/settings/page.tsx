@@ -55,9 +55,9 @@ export default function SettingsPage() {
     setProvider(value);
     const p = PROVIDERS.find((x) => x.value === value);
     if (p) {
-      if (!label) setLabel(p.label);
-      if (!model) setModel(p.defaultModel);
-      if (!baseUrl) setBaseUrl(p.defaultUrl);
+      setLabel(p.label);
+      setModel(p.defaultModel);
+      setBaseUrl(p.defaultUrl);
     }
   };
 
