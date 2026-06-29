@@ -51,9 +51,16 @@ def run_crawler(url: str) -> dict:
             ["node", CRAWLER_SCRIPT, url],
             capture_output=True, text=True, timeout=90,
         )
-        return json.loads(proc.stdout.strip())
+        stdout = proc.stdout.strip()
+        if not stdout:
+            # node 进程崩溃, stderr 里通常有模块缺失等错误
+            err = proc.stderr.strip() or f"exit code {proc.returncode}, stdout 为空"
+            return {"url": url, "title": "", "content": "", "error": f"爬虫无输出: {err[:500]}"}
+        return json.loads(stdout)
     except json.JSONDecodeError:
-        return {"url": url, "title": "", "content": "", "error": "爬虫输出解析失败"}
+        # stdout 不是合法 JSON, 把原始输出截断后返回便于排查
+        raw = (proc.stdout or "")[:500]
+        return {"url": url, "title": "", "content": "", "error": f"爬虫输出解析失败: {raw}"}
     except Exception as e:
         return {"url": url, "title": "", "content": "", "error": str(e)}
 

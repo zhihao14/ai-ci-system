@@ -21,7 +21,8 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 # 安装爬虫依赖 + Playwright Chromium
 COPY crawler /app/crawler
-RUN cd /app/crawler/shared && npm install --production \
+RUN cd /app/crawler && npm install --production \
+    && cd /app/crawler/shared && npm install --production \
     && cd /app/crawler/douyin && npm install --production \
     && cd /app/crawler/tiktok && npm install --production \
     && cd /app/crawler/youtube && npm install --production \
