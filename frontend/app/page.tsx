@@ -101,12 +101,20 @@ export default function Home() {
             粘贴主页分享链接, 自动爬取并由 AI 生成结构化情报报告
           </p>
         </div>
-        <a
-          href="/settings"
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-        >
-          AI 配置
-        </a>
+        <div className="flex gap-2">
+          <a
+            href="/growth"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            增长策略分析
+          </a>
+          <a
+            href="/settings"
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+          >
+            AI 配置
+          </a>
+        </div>
       </header>
 
       {/* 提交表单 */}

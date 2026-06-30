@@ -32,6 +32,12 @@ class AIConfigUpdate(BaseModel):
     priority: Optional[int] = None
 
 
+class GrowthAnalysisRequest(BaseModel):
+    """短视频增长策略分析请求"""
+    url: str                             # 账号主页分享链接或 URL
+    videos: Optional[list] = None       # 可选: 视频数据列表(含 title/desc/digg_count 等)
+
+
 # ---- 响应模型 ----
 class IntelligenceReport(BaseModel):
     """返回给前端的情报报告"""

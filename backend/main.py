@@ -17,13 +17,14 @@ from dotenv import load_dotenv
 from models import (
     AnalyzeRequest, IntelligenceReport,
     AIConfigCreate, AIConfigUpdate, AIConfigResponse,
+    GrowthAnalysisRequest,
 )
 from db import (
     upsert_competitor, insert_report, list_reports, get_report,
     list_ai_configs, get_active_ai_configs, insert_ai_config,
     update_ai_config, delete_ai_config,
 )
-from ai_service import analyze
+from ai_service import analyze, growth_analyze
 
 # 加载环境变量
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
@@ -172,6 +173,44 @@ def report_detail(report_id: str):
         ai_provider=row.get("ai_provider"),
         created_at=row.get("created_at"),
     )
+
+
+# ============================================================
+# 短视频增长策略分析 (4层框架)
+# ============================================================
+
+@app.post("/api/growth-analysis")
+def growth_analysis(req: GrowthAnalysisRequest):
+    """短视频增长策略分析: 爬取账号信息 -> AI 4层分析 -> 返回结构化JSON"""
+    url = req.url.strip()
+    videos = req.videos
+
+    # 1) 爬取账号信息
+    crawled = run_crawler(url)
+    if crawled.get("error"):
+        raise HTTPException(status_code=502, detail=f"爬取失败: {crawled['error']}")
+
+    title = crawled.get("title") or url
+    content = crawled.get("content") or ""
+    if not content.strip():
+        raise HTTPException(status_code=422, detail="页面正文为空, 无法分析")
+
+    # 2) AI 增长策略分析
+    result = growth_analyze(content, videos)
+    if result.get("ai_provider") == "none":
+        raise HTTPException(
+            status_code=503,
+            detail=result.get("error", "AI 分析失败, 请检查 AI 配置"),
+        )
+
+    # 3) 返回4层结构化结果
+    return {
+        "url": url,
+        "title": title,
+        "account_info": content,
+        "analysis": result,
+        "ai_provider": result.get("ai_provider"),
+    }
 
 
 # ============================================================
