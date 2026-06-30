@@ -43,7 +43,7 @@ interface AnalyzeResult {
     actionable_insights?: unknown[];
   };
   trends?: {
-    content_trends?: { rising?: unknown[]; falling?: unknown[]; stable?: unknown[] };
+    content_trends?: Array<{ trend?: string; direction?: string; [k: string]: unknown }> | { rising?: unknown[]; falling?: unknown[]; stable?: unknown[] };
     engagement_forecast?: Record<string, unknown>;
     growth_trajectory?: Record<string, unknown>;
   };
@@ -168,7 +168,15 @@ export default function IntelligencePage() {
     );
   };
 
-  const trends = analyze?.trends?.content_trends;
+  // 兼容 content_trends 的两种格式: 数组 [{direction: "rising"...}] 或对象 {rising: [...]}
+  const rawTrends = analyze?.trends?.content_trends;
+  const trends = Array.isArray(rawTrends)
+    ? {
+        rising: (rawTrends as Array<{ direction?: string }>).filter((t) => t.direction === "rising"),
+        falling: (rawTrends as Array<{ direction?: string }>).filter((t) => t.direction === "falling"),
+        stable: (rawTrends as Array<{ direction?: string }>).filter((t) => t.direction === "stable"),
+      }
+    : (rawTrends as { rising?: unknown[]; falling?: unknown[]; stable?: unknown[] });
   const trendGroup = (label: string, items: unknown[] | undefined, color: string) =>
     items && items.length > 0 ? (
       <div>
