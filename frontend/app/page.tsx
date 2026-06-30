@@ -429,7 +429,7 @@ export default function DashboardHomePage() {
               {score ? (
                 <div className="space-y-3">
                   {Object.entries(score.dimensions).map(([key, val]) =>
-                    dimBar(key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), val)
+                    dimBar(t(`dashboard.dim_${key}`), val)
                   )}
                 </div>
               ) : (
