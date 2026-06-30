@@ -52,7 +52,7 @@
     "noThreats": "未检测到威胁",
     "noThreatData": "无威胁数据",
     "impact": "影响",
-    "confidence": "置信度",
+    "confidence": "可靠度",
     "attackStrategy": "攻击策略建议",
     "generatingCounter": "生成反制策略中...",
     "noCounterStrategies": "无反制策略",
@@ -77,7 +77,7 @@
   },
   "intelligence": {
     "title": "智能分析",
-    "subtitle": "爬取抖音账号视频 → AI 模式分析 → 生成竞争策略 · 每条结论附置信度与证据字段",
+    "subtitle": "爬取抖音账号视频 → AI 模式分析 → 生成竞争策略 · 每条结论附可靠度与数据来源",
     "urlPlaceholder": "粘贴抖音账号分享链接",
     "crawlBtn": "开始爬取",
     "crawling": "爬取中...",

@@ -1,7 +1,7 @@
 "use client";
 
 // result-display.tsx — 共享结果展示组件
-// 被智能分析 / 对比页面复用: 置信度徽标、数据卡片、列表/对象渲染
+// 被智能分析 / 对比页面复用: 可靠度徽标、数据卡片、列表/对象渲染
 
 // ---- 字段名中文翻译映射 ----
 const FIELD_LABELS: Record<string, string> = {
@@ -43,7 +43,6 @@ const FIELD_LABELS: Record<string, string> = {
   projected_growth: "预计增长",
   bottleneck: "增长瓶颈",
   opportunity: "机会",
-  action: "行动方案",
   // 策略
   executive_summary: "总结",
   short_term_actions: "短期行动",
@@ -74,7 +73,7 @@ const FIELD_LABELS: Record<string, string> = {
   action_plan: "行动方案",
   expected_impact: "预期效果",
   priority: "优先级",
-  confidence_score: "置信度",
+  confidence_score: "可靠度",
 };
 
 const TITLE_KEYS = [
@@ -140,7 +139,7 @@ export function EvidenceTags({ fields }: { fields?: string[] }) {
   );
 }
 
-// 渲染数组: 字符串列表或对象列表 (自动识别标题, 附置信度/证据)
+// 渲染数组: 字符串列表或对象列表 (自动识别标题, 附可靠度/数据来源)
 export function Items({ items }: { items?: unknown[] }) {
   if (!items || !items.length)
     return <p className="text-sm text-slate-400">暂无数据</p>;
@@ -173,7 +172,7 @@ export function Items({ items }: { items?: unknown[] }) {
           <div key={i} className="rounded-lg border border-slate-200 px-3 py-2">
             {title && <p className="text-sm font-medium text-slate-800">{title}</p>}
             {rest && <p className="mt-0.5 text-xs text-slate-500">{rest}</p>}
-            {o.supporting_data && (
+            {o.supporting_data != null && String(o.supporting_data) && (
               <p className="mt-1 text-xs text-slate-400">数据支撑: {String(o.supporting_data)}</p>
             )}
             <div className="mt-1.5 flex items-center gap-2">
@@ -187,7 +186,7 @@ export function Items({ items }: { items?: unknown[] }) {
   );
 }
 
-// 渲染单个对象: 键值对列表 + 置信度/证据
+// 渲染单个对象: 键值对列表 + 可靠度/数据来源
 export function ObjectView({ obj }: { obj: Record<string, unknown> | undefined | null }) {
   if (!obj || typeof obj !== "object")
     return <p className="text-sm text-slate-400">暂无数据</p>;
@@ -206,7 +205,7 @@ export function ObjectView({ obj }: { obj: Record<string, unknown> | undefined |
           </div>
         ))}
       </dl>
-      {obj.supporting_data && (
+      {obj.supporting_data != null && String(obj.supporting_data) && (
         <p className="mt-2 text-xs text-slate-400">数据支撑: {String(obj.supporting_data)}</p>
       )}
       <div className="mt-2 flex items-center gap-2">

@@ -77,7 +77,7 @@
   },
   "intelligence": {
     "title": "Intelligence Analysis",
-    "subtitle": "Crawl videos → AI pattern analysis → Generate competitive strategy · Each conclusion includes confidence score and evidence fields",
+    "subtitle": "Crawl videos → AI pattern analysis → Generate competitive strategy · Each conclusion includes reliability score and data source",
     "urlPlaceholder": "Paste Douyin account share link",
     "crawlBtn": "Start Crawling",
     "crawling": "Crawling...",
