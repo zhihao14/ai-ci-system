@@ -350,7 +350,7 @@ def _openai_compatible_growth(cfg: dict, account_info: str, videos: list[dict] |
         "temperature": 0.1,
         "response_format": {"type": "json_object"},
     }
-    with httpx.Client(timeout=30.0) as client:
+    with httpx.Client(timeout=45.0) as client:
         resp = client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()
