@@ -107,7 +107,7 @@ def analyze_competitor(req: AnalyzeRequest):
 
     # 2) AI 情报分析
     ai = analyze(title, content)
-    if not ai or ai.get("ai_provider") == "none":
+    if not ai or ai.get("ai_provider") == "无":
         raise HTTPException(status_code=503, detail=ai.get("summary", "AI 分析失败, 请检查 AI 配置"))
 
     # 3) 落库: 先 upsert 竞争对手, 再插入报告
@@ -217,7 +217,7 @@ def analyze_growth(req: dict):
         raise HTTPException(status_code=422, detail="账号信息和视频数据均为空")
 
     result = growth_analyze(account_info, videos, account_fields)
-    if result.get("ai_provider") == "none":
+    if result.get("ai_provider") == "无":
         raise HTTPException(
             status_code=503,
             detail=result.get("error", "AI 分析失败, 请检查 AI 配置"),
@@ -249,7 +249,7 @@ def growth_analysis(req: GrowthAnalysisRequest):
 
     # 2) AI 分析
     result = growth_analyze(content, videos, account_fields)
-    if result.get("ai_provider") == "none":
+    if result.get("ai_provider") == "无":
         raise HTTPException(
             status_code=503,
             detail=result.get("error", "AI 分析失败, 请检查 AI 配置"),

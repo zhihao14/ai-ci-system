@@ -61,11 +61,11 @@ interface StrategyResult {
   ai_provider?: string;
 }
 
-const STEPS = ["Crawl", "Analyze", "Strategy"];
+const STEPS = ["爬取", "分析", "策略"];
 
 const ANALYZE_SUB_STEPS = [
   { key: "pattern", label: "内容模式识别" },
-  { key: "growth", label: "Evidence-based 分析" },
+  { key: "growth", label: "数据分析" },
   { key: "trend", label: "趋势预测" },
 ] as const;
 
@@ -143,14 +143,14 @@ export default function IntelligencePage() {
       setAnalyzeStep("growth");
       const gr = await api("analyze", { video_analysis_id: id, step: "growth" });
       acc.analysis = gr.analysis;
-      if (gr.ai_provider && gr.ai_provider !== "none") acc.ai_provider = gr.ai_provider;
+      if (gr.ai_provider && gr.ai_provider !== "无") acc.ai_provider = gr.ai_provider;
       setAnalyze({ ...acc });
 
       // Step 2c: Trend
       setAnalyzeStep("trend");
       const tr = await api("analyze", { video_analysis_id: id, step: "trend" });
       acc.trends = tr.trends;
-      if (tr.ai_provider && tr.ai_provider !== "none") acc.ai_provider = tr.ai_provider;
+      if (tr.ai_provider && tr.ai_provider !== "无") acc.ai_provider = tr.ai_provider;
       setAnalyze({ ...acc });
 
       setStep(2);
@@ -276,7 +276,7 @@ export default function IntelligencePage() {
       {crawl && (
         <div className="mb-6 space-y-6">
           <SectionCard
-            title="Crawl Results"
+            title="爬取结果"
             right={
               <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
                 {crawl.video_count ?? 0} {t("common.videos")}

@@ -118,7 +118,7 @@ def _call_ai_for_patterns(videos: list[dict], account_fields: dict | None, rag_c
 
     configs = _get_configs()
     if not configs:
-        return {"error": "无可用 AI 配置", "ai_provider": "none"}
+        return {"error": "无可用 AI 配置", "ai_provider": "无"}
 
     prompt = _build_pattern_prompt(videos, account_fields, rag_context)
 
@@ -161,7 +161,7 @@ def _call_ai_for_patterns(videos: list[dict], account_fields: dict | None, rag_c
             print(f"[PatternAgent] {cfg['label']} 失败: {e}")
             continue
 
-    return {"error": "所有 AI 供应商均不可用", "ai_provider": "none"}
+    return {"error": "所有 AI 供应商均不可用", "ai_provider": "无"}
 
 
 class PatternAgent(BaseAgent):
@@ -202,5 +202,5 @@ class PatternAgent(BaseAgent):
             "agent": self.name,
             "topic_clusters": len(result.get("topic_clusters", [])),
             "differentiators": len(result.get("content_differentiators", [])),
-            "ai_provider": result.get("ai_provider", "none"),
+            "ai_provider": result.get("ai_provider", "无"),
         }

@@ -333,7 +333,7 @@ export default function DashboardHomePage() {
                 <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
                   {t("dashboard.executiveSummary")}
                 </span>
-                {execSummary?.ai_provider && execSummary.ai_provider !== "none" && (
+                {execSummary?.ai_provider && execSummary.ai_provider !== "无" && (
                   <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
                     {execSummary.ai_provider}
                   </span>
@@ -370,7 +370,7 @@ export default function DashboardHomePage() {
                   )}
                 </>
               ) : (
-                <p className="text-sm text-slate-400">Failed to generate summary</p>
+                <p className="text-sm text-slate-400">摘要生成失败</p>
               )}
             </div>
 
@@ -391,7 +391,7 @@ export default function DashboardHomePage() {
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-slate-400">No score data</p>
+                <p className="text-sm text-slate-400">暂无评分数据</p>
               )}
             </div>
           </div>
@@ -546,7 +546,7 @@ export default function DashboardHomePage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900">{t("dashboard.attackStrategy")}</h3>
-              {counter?.ai_provider && counter.ai_provider !== "none" && (
+              {counter?.ai_provider && counter.ai_provider !== "无" && (
                 <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">
                   {counter.ai_provider}
                 </span>

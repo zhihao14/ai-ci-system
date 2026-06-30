@@ -130,7 +130,7 @@ def _call_ai_for_comparison(analyses: list[dict], rag_context: str = "") -> dict
 
     configs = _get_configs()
     if not configs:
-        return {"error": "无可用 AI 配置", "ai_provider": "none"}
+        return {"error": "无可用 AI 配置", "ai_provider": "无"}
 
     prompt = _build_comparison_prompt(analyses, rag_context)
 
@@ -173,7 +173,7 @@ def _call_ai_for_comparison(analyses: list[dict], rag_context: str = "") -> dict
             print(f"[ComparisonAgent] {cfg['label']} 失败: {e}")
             continue
 
-    return {"error": "所有 AI 供应商均不可用", "ai_provider": "none"}
+    return {"error": "所有 AI 供应商均不可用", "ai_provider": "无"}
 
 
 class ComparisonAgent(BaseAgent):
@@ -210,5 +210,5 @@ class ComparisonAgent(BaseAgent):
             "competitors_compared": len(analyses),
             "matrix_rows": len(result.get("comparison_matrix", [])),
             "recommendations": len(result.get("strategic_recommendations", [])),
-            "ai_provider": result.get("ai_provider", "none"),
+            "ai_provider": result.get("ai_provider", "无"),
         }

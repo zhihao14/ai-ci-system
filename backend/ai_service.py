@@ -146,7 +146,7 @@ def analyze(title: str, content: str) -> dict:
             "summary": "AI 分析失败: 未配置任何 AI 供应商, 请前往设置页面配置",
             "products": [], "pricing": [], "positioning": {},
             "strengths": [], "weaknesses": [], "recent_changes": "",
-            "ai_provider": "none",
+            "ai_provider": "无",
         }
 
     for cfg in configs:
@@ -169,7 +169,7 @@ def analyze(title: str, content: str) -> dict:
         "summary": "AI 分析失败, 所有 AI 供应商均不可用, 请检查配置",
         "products": [], "pricing": [], "positioning": {},
         "strengths": [], "weaknesses": [], "recent_changes": "",
-        "ai_provider": "none",
+        "ai_provider": "无",
     }
 
 
@@ -396,7 +396,7 @@ def growth_analyze(account_info: str, videos: list[dict] | None = None, account_
     if not configs:
         return {
             "error": "未配置任何 AI 供应商, 请前往设置页面配置",
-            "ai_provider": "none",
+            "ai_provider": "无",
         }
 
     errors = []
@@ -419,5 +419,5 @@ def growth_analyze(account_info: str, videos: list[dict] | None = None, account_
     error_detail = "; ".join(errors) if errors else "未知错误"
     return {
         "error": f"所有 AI 供应商均不可用, 请检查配置。详细错误: {error_detail}",
-        "ai_provider": "none",
+        "ai_provider": "无",
     }

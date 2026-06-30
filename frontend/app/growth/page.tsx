@@ -116,7 +116,7 @@ function confidenceLabel(score: number | null): string {
 function ConfidenceBadge({ score }: { score: number | null }) {
   return (
     <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${confidenceColor(score)}`}>
-      {score !== null ? `${(score * 100).toFixed(0)}%` : "N/A"} · {confidenceLabel(score)}
+      {score !== null ? `${(score * 100).toFixed(0)}%` : "—"} · {confidenceLabel(score)}
     </span>
   );
 }
@@ -126,7 +126,7 @@ function EvidenceTags({ fields }: { fields: string[] }) {
   return (
     <div className="flex flex-wrap gap-1">
       {fields.map((f, i) => (
-        <span key={i} className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 font-mono">
+        <span key={i} className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
           {f}
         </span>
       ))}
@@ -219,7 +219,7 @@ export default function GrowthPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">短视频数据分析</h1>
           <p className="text-sm text-slate-500">
-            Evidence-based 聚合分析 · 基于数据证据 · 每条结论附置信度
+            数据聚合分析 · 基于数据证据 · 每条结论附置信度
           </p>
         </div>
         <a
@@ -339,11 +339,11 @@ export default function GrowthPage() {
 
             <details className="mt-3">
               <summary className="cursor-pointer text-xs font-medium text-slate-400">
-                查看账号原始信息
+                查看账号信息
               </summary>
-              <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs text-slate-600 max-h-32 overflow-y-auto">
+              <div className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
                 {result.account_info}
-              </pre>
+              </div>
             </details>
           </div>
 
@@ -621,15 +621,7 @@ export default function GrowthPage() {
             )}
           </section>
 
-          {/* JSON 原始数据 (折叠) */}
-          <details className="rounded-2xl border border-slate-200 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-medium text-slate-500">
-              查看完整 JSON 数据
-            </summary>
-            <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-300">
-              {JSON.stringify(a, null, 2)}
-            </pre>
-          </details>
+          {/* 原始数据已移除 - 不再显示 JSON */}
         </div>
       )}
     </main>

@@ -79,7 +79,7 @@ def crawl_and_save(url: str, max_videos: int = 50) -> dict:
         "account_fields": account_fields,
         "videos": videos,
         "video_count": len(videos),
-        "ai_provider": "pending",
+        "ai_provider": "处理中",
     })
 
     return {
@@ -113,8 +113,8 @@ def _compute_aggregate_analysis(videos: list[dict], account_fields: dict | None 
         return {
             "high_frequency_keywords": [],
             "engagement_ranking": [],
-            "posting_time_pattern": {"peak_hours": [], "weekday_distribution": {}, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["create_time"]},
-            "like_comment_ratio": {"average_ratio": None, "min_ratio": None, "max_ratio": None, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["digg_count", "comment_count"]},
+            "posting_time_pattern": {"peak_hours": [], "weekday_distribution": {}, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["发布时间"]},
+            "like_comment_ratio": {"average_ratio": None, "min_ratio": None, "max_ratio": None, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["点赞数", "评论数"]},
             "top_content_types": [],
         }
 
@@ -129,7 +129,7 @@ def _compute_aggregate_analysis(videos: list[dict], account_fields: dict | None 
             if w not in _CN_STOPWORDS and len(w) >= 2:
                 word_counter[w] += 1
     high_freq = [
-        {"keyword": kw, "occurrence_count": cnt, "confidence_score": 1.0, "evidence_fields": ["title", "desc"]}
+        {"keyword": kw, "occurrence_count": cnt, "confidence_score": 1.0, "evidence_fields": ["标题", "描述"]}
         for kw, cnt in word_counter.most_common(10) if cnt >= 2
     ]
 
@@ -148,7 +148,7 @@ def _compute_aggregate_analysis(videos: list[dict], account_fields: dict | None 
             "comment_count": v.get("comment_count") or 0,
             "share_count": v.get("share_count") or 0,
             "confidence_score": 1.0,
-            "evidence_fields": ["digg_count", "comment_count", "share_count"],
+            "evidence_fields": ["点赞数", "评论数", "转发数"],
         }
         for i, v in enumerate(ranked)
     ]
@@ -177,11 +177,11 @@ def _compute_aggregate_analysis(videos: list[dict], account_fields: dict | None 
             "peak_hours": peak_hours,
             "weekday_distribution": dict(weekday_counts),
             "confidence_score": 1.0,
-            "evidence_fields": ["create_time"],
+            "evidence_fields": ["发布时间"],
             "status": "数据充足已计算",
         }
     else:
-        posting_pattern = {"peak_hours": [], "weekday_distribution": {}, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["create_time"]}
+        posting_pattern = {"peak_hours": [], "weekday_distribution": {}, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["发布时间"]}
 
     # 4. 点赞评论比
     ratios = []
@@ -196,11 +196,11 @@ def _compute_aggregate_analysis(videos: list[dict], account_fields: dict | None 
             "min_ratio": round(min(ratios), 2),
             "max_ratio": round(max(ratios), 2),
             "confidence_score": 1.0,
-            "evidence_fields": ["digg_count", "comment_count"],
+            "evidence_fields": ["点赞数", "评论数"],
             "status": "数据充足已计算",
         }
     else:
-        ratio_data = {"average_ratio": None, "min_ratio": None, "max_ratio": None, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["digg_count", "comment_count"]}
+        ratio_data = {"average_ratio": None, "min_ratio": None, "max_ratio": None, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["点赞数", "评论数"]}
 
     # 5. 高表现内容类型 (简单关键词分类)
     type_keywords = {
@@ -237,7 +237,7 @@ def _compute_aggregate_analysis(videos: list[dict], account_fields: dict | None 
             "video_count": s["count"],
             "avg_engagement": round(s["total_engagement"] / s["count"], 1) if s["count"] else 0,
             "confidence_score": 0.8,
-            "evidence_fields": ["title", "digg_count"],
+            "evidence_fields": ["标题", "点赞数"],
         }
         for ctype, s in sorted(type_stats.items(), key=lambda x: x[1]["total_engagement"], reverse=True)
     ]
@@ -262,8 +262,9 @@ def _generate_insights(stats: dict, account_fields: dict | None, account_name: s
     stats_json = json.dumps(stats, ensure_ascii=False, indent=2)
     account_json = json.dumps(account_fields, ensure_ascii=False) if account_fields else "无"
 
-    prompt = f"""基于以下预计算的统计数据, 生成 3-5 条 actionable insights。
-每条 insight 必须引用具体数值, 禁止推测或编造。
+    prompt = f"""基于以下预计算的统计数据, 生成 3-5 条可执行洞察。
+每条洞察必须引用具体数值, 禁止推测或编造。
+evidence_fields 使用中文字段名（如：标题、描述、发布时间、点赞数、评论数、转发数）。
 
 【账号】{account_name}
 【账号字段】{account_json}
@@ -271,7 +272,7 @@ def _generate_insights(stats: dict, account_fields: dict | None, account_name: s
 {stats_json}
 
 以 JSON 对象输出, 格式:
-{{"insights": [{{"insight": "结论", "confidence_score": 0.9, "evidence_fields": ["字段名"], "supporting_data": "引用的具体数值"}}]}}
+{{"insights": [{{"insight": "结论", "confidence_score": 0.9, "evidence_fields": ["标题", "点赞数"], "supporting_data": "引用的具体数值"}}]}}
 """
 
     for cfg in configs:
@@ -282,7 +283,7 @@ def _generate_insights(stats: dict, account_fields: dict | None, account_name: s
                 ac = Anthropic(api_key=cfg["api_key"])
                 msg = ac.messages.create(
                     model=cfg["model"], max_tokens=1500,
-                    system="你是数据分析师。只输出JSON数组, 不要额外文字。",
+                    system="你是数据分析师。只输出JSON数组, 不要额外文字。所有内容用中文输出。",
                     messages=[{"role": "user", "content": prompt}],
                 )
                 text = msg.content[0].text
@@ -293,7 +294,7 @@ def _generate_insights(stats: dict, account_fields: dict | None, account_name: s
                 payload = {
                     "model": cfg["model"],
                     "messages": [
-                        {"role": "system", "content": "你是数据分析师。只输出JSON数组, 不要额外文字。"},
+                        {"role": "system", "content": "你是数据分析师。只输出JSON数组, 不要额外文字。所有内容用中文输出。"},
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.1,
@@ -352,10 +353,10 @@ def run_pattern_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
         })
     except Exception as e:
         print(f"[intelligence] PatternAgent 失败: {e}")
-        patterns = {"error": str(e), "ai_provider": "none"}
+        patterns = {"error": str(e), "ai_provider": "无"}
 
     try:
-        if patterns.get("ai_provider") != "none":
+        if patterns.get("ai_provider") != "无":
             get_kb().store_entry(
                 competitor_id=competitor_id,
                 content_type="pattern",
@@ -369,7 +370,7 @@ def run_pattern_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
     return {
         "video_analysis_id": video_analysis_id,
         "patterns": patterns,
-        "ai_provider": patterns.get("ai_provider", "none"),
+        "ai_provider": patterns.get("ai_provider", "无"),
         "rag_context_used": rag_used,
     }
 
@@ -467,10 +468,10 @@ def run_trend_prediction(video_analysis_id: str, use_rag: bool = True) -> dict:
         })
     except Exception as e:
         print(f"[intelligence] Trend Prediction 失败: {e}")
-        trends = {"error": str(e), "ai_provider": "none"}
+        trends = {"error": str(e), "ai_provider": "无"}
 
     try:
-        if trends.get("ai_provider") != "none":
+        if trends.get("ai_provider") != "无":
             get_kb().store_entry(
                 competitor_id=competitor_id,
                 content_type="trend",
@@ -484,7 +485,7 @@ def run_trend_prediction(video_analysis_id: str, use_rag: bool = True) -> dict:
     return {
         "video_analysis_id": video_analysis_id,
         "trends": trends,
-        "ai_provider": trends.get("ai_provider", "none"),
+        "ai_provider": trends.get("ai_provider", "无"),
         "rag_context_used": rag_used,
     }
 
@@ -500,7 +501,7 @@ def run_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
         "patterns": pattern_result["patterns"],
         "analysis": growth_result["analysis"],
         "trends": trend_result["trends"],
-        "ai_provider": pattern_result.get("ai_provider", "none"),
+        "ai_provider": pattern_result.get("ai_provider", "无"),
         "rag_context_used": pattern_result.get("rag_context_used") or trend_result.get("rag_context_used"),
     }
 
@@ -518,24 +519,24 @@ TREND_SYSTEM_PROMPT = (
 
 TREND_SCHEMA = """{
   "content_trends": [
-    {"trend": "上升/下降/稳定的话题", "direction": "rising|falling|stable", "current_frequency": 0, "confidence_score": 0.8, "evidence_fields": ["title"]}
+    {"trend": "上升/下降/稳定的话题", "direction": "rising|falling|stable", "current_frequency": 0, "confidence_score": 0.8, "evidence_fields": ["标题"]}
   ],
   "engagement_forecast": {
     "expected_avg_engagement": 0,
     "trend_direction": "upward|downward|flat",
     "key_driver": "驱动互动变化的主要因素",
     "confidence_score": 0.7,
-    "evidence_fields": ["digg_count", "comment_count"]
+    "evidence_fields": ["点赞数", "评论数"]
   },
   "growth_trajectory": {
     "current_momentum": "accelerating|steady|decelerating",
     "projected_growth": "基于发布频率和互动趋势的预测",
     "bottleneck": "增长瓶颈",
     "confidence_score": 0.6,
-    "evidence_fields": ["follower_count", "aweme_count"]
+    "evidence_fields": ["粉丝数", "视频数"]
   },
   "emerging_opportunities": [
-    {"opportunity": "机会描述", "action": "建议行动", "confidence_score": 0.6, "evidence_fields": ["title"]}
+    {"opportunity": "机会描述", "action": "建议行动", "confidence_score": 0.6, "evidence_fields": ["标题"]}
   ]
 }"""
 
@@ -546,7 +547,7 @@ def _predict_trends(videos: list[dict], account_fields: dict | None, rag_context
 
     configs = _get_configs()
     if not configs:
-        return {"error": "无可用 AI 配置", "ai_provider": "none"}
+        return {"error": "无可用 AI 配置", "ai_provider": "无"}
 
     # 构造 prompt: 只传统计摘要, 减少上下文
     total_likes = sum(v.get("digg_count") or 0 for v in videos)
@@ -582,7 +583,7 @@ def _predict_trends(videos: list[dict], account_fields: dict | None, rag_context
 请严格按照以下 JSON Schema 输出:
 {TREND_SCHEMA}
 
-evidence_fields 必须使用真实字段名: title, digg_count, comment_count, share_count, follower_count, aweme_count
+evidence_fields 必须使用中文字段名: 标题, 点赞数, 评论数, 转发数, 粉丝数, 视频数
 """
 
     for cfg in configs:
@@ -623,7 +624,7 @@ evidence_fields 必须使用真实字段名: title, digg_count, comment_count, s
             print(f"[TrendPrediction] {cfg['label']} 失败: {e}")
             continue
 
-    return {"error": "所有 AI 供应商均不可用", "ai_provider": "none"}
+    return {"error": "所有 AI 供应商均不可用", "ai_provider": "无"}
 
 
 # ============================================================
@@ -640,23 +641,23 @@ STRATEGY_SYSTEM_PROMPT = (
 STRATEGY_SCHEMA = """{
   "executive_summary": "一段话概述核心策略方向",
   "short_term_actions": [
-    {"action": "短期行动(1-2周)", "expected_impact": "预期效果", "priority": "high|medium|low", "confidence_score": 0.8, "evidence_fields": ["digg_count"]}
+    {"action": "短期行动(1-2周)", "expected_impact": "预期效果", "priority": "high|medium|low", "confidence_score": 0.8, "evidence_fields": ["点赞数"]}
   ],
   "mid_term_strategy": [
-    {"strategy": "中期策略(1-3月)", "milestone": "里程碑", "confidence_score": 0.7, "evidence_fields": ["follower_count"]}
+    {"strategy": "中期策略(1-3月)", "milestone": "里程碑", "confidence_score": 0.7, "evidence_fields": ["粉丝数"]}
   ],
   "content_calendar": {
     "recommended_topics": ["建议选题1", "建议选题2"],
     "optimal_posting_times": ["最佳发布时段"],
     "content_mix": {"比例描述": "如 40%教育/30%娱乐/30%互动"},
     "confidence_score": 0.7,
-    "evidence_fields": ["create_time", "title"]
+    "evidence_fields": ["发布时间", "标题"]
   },
   "kpi_targets": [
-    {"metric": "指标名", "current": "当前值", "target": "目标值", "timeline": "时间线", "confidence_score": 0.6, "evidence_fields": ["follower_count"]}
+    {"metric": "指标名", "current": "当前值", "target": "目标值", "timeline": "时间线", "confidence_score": 0.6, "evidence_fields": ["粉丝数"]}
   ],
   "risk_mitigation": [
-    {"risk": "风险描述", "mitigation": "缓解措施", "confidence_score": 0.5, "evidence_fields": ["aweme_count"]}
+    {"risk": "风险描述", "mitigation": "缓解措施", "confidence_score": 0.5, "evidence_fields": ["视频数"]}
   ]
 }"""
 
@@ -695,7 +696,7 @@ def generate_strategy(video_analysis_id: str, use_rag: bool = True) -> dict:
 
     configs = _get_configs()
     if not configs:
-        return {"error": "无可用 AI 配置", "ai_provider": "none"}
+        return {"error": "无可用 AI 配置", "ai_provider": "无"}
 
     # 构造 prompt
     account_json = json.dumps(account_fields, ensure_ascii=False) if account_fields else "无"
@@ -722,7 +723,7 @@ def generate_strategy(video_analysis_id: str, use_rag: bool = True) -> dict:
 请严格按照以下 JSON Schema 输出:
 {STRATEGY_SCHEMA}
 
-evidence_fields 必须使用真实字段名: follower_count, digg_count, comment_count, share_count, aweme_count, title, create_time
+evidence_fields 必须使用中文字段名: 粉丝数, 点赞数, 评论数, 转发数, 视频数, 标题, 发布时间
 """
 
     for cfg in configs:
@@ -789,7 +790,7 @@ evidence_fields 必须使用真实字段名: follower_count, digg_count, comment
             print(f"[StrategyEngine] {cfg['label']} 失败: {e}")
             continue
 
-    return {"error": "所有 AI 供应商均不可用", "ai_provider": "none"}
+    return {"error": "所有 AI 供应商均不可用", "ai_provider": "无"}
 
 
 # ============================================================
@@ -831,7 +832,7 @@ def compare_competitors(analysis_ids: list[str]) -> dict:
     comparison = insert_comparison({
         "analysis_ids": analysis_ids,
         "comparison_data": result,
-        "ai_provider": result.get("ai_provider", "none"),
+        "ai_provider": result.get("ai_provider", "无"),
     })
 
     # 存入 RAG
@@ -849,7 +850,7 @@ def compare_competitors(analysis_ids: list[str]) -> dict:
     return {
         "comparison_id": comparison["id"],
         "comparison_data": result,
-        "ai_provider": result.get("ai_provider", "none"),
+        "ai_provider": result.get("ai_provider", "无"),
     }
 
 

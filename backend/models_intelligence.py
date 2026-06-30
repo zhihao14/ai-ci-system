@@ -57,7 +57,7 @@ class AnalyzeResponse(BaseModel):
     patterns: Optional[dict] = None
     analysis: Optional[dict] = None
     trends: Optional[dict] = None
-    ai_provider: str = "none"
+    ai_provider: str = "无"
     rag_context_used: bool = False
 
 
@@ -65,7 +65,7 @@ class StrategyResponse(BaseModel):
     """策略结果"""
     video_analysis_id: str
     strategy: Optional[dict] = None
-    ai_provider: str = "none"
+    ai_provider: str = "无"
     rag_context_used: bool = False
 
 
@@ -73,7 +73,7 @@ class ComparisonResponse(BaseModel):
     """对比结果"""
     comparison_id: str
     comparison_data: Optional[dict] = None
-    ai_provider: str = "none"
+    ai_provider: str = "无"
 
 
 class KnowledgeSearchResult(BaseModel):

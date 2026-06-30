@@ -43,7 +43,7 @@ def calculate_competitor_score(video_analysis_id: str) -> dict:
 
     videos = va.get("videos") or []
     account_fields = va.get("account_fields") or {}
-    account_name = va.get("account_name") or "Unknown"
+    account_name = va.get("account_name") or "未知账号"
 
     if not videos:
         return _empty_score(video_analysis_id, account_name)
@@ -193,7 +193,7 @@ def _empty_score(analysis_id: str, account_name: str) -> dict:
         "analysis_id": analysis_id,
         "account_name": account_name,
         "overall_score": 0,
-        "grade": "N/A",
+        "grade": "—",
         "dimensions": {"reach": 0, "engagement": 0, "consistency": 0, "virality": 0, "content_depth": 0},
         "raw_metrics": {},
         "benchmarks": {},
@@ -221,7 +221,7 @@ def generate_executive_summary(video_analysis_id: str) -> dict:
     strategy = get_growth_strategy(video_analysis_id)
     analysis = va.get("analysis") or {}
 
-    account_name = va.get("account_name") or "Unknown"
+    account_name = va.get("account_name") or "未知账号"
     account_fields = va.get("account_fields") or {}
     videos = va.get("videos") or []
     follower_count = account_fields.get("follower_count") or 0
@@ -263,7 +263,7 @@ def generate_executive_summary(video_analysis_id: str) -> dict:
             "summary": _fallback_summary(brief),
             "score": score_data["overall_score"],
             "grade": score_data["grade"],
-            "ai_provider": "none",
+            "ai_provider": "无",
         }
 
     brief_json = json.dumps(brief, ensure_ascii=False, indent=2)
@@ -335,7 +335,7 @@ def generate_executive_summary(video_analysis_id: str) -> dict:
         "score": score_data["overall_score"],
         "grade": score_data["grade"],
         "dimensions": score_data["dimensions"],
-        "ai_provider": "none",
+        "ai_provider": "无",
     }
 
 
@@ -369,7 +369,7 @@ def detect_threats(video_analysis_id: str) -> dict:
 
     videos = va.get("videos") or []
     account_fields = va.get("account_fields") or {}
-    account_name = va.get("account_name") or "Unknown"
+    account_name = va.get("account_name") or "未知账号"
 
     threats = []
     score_data = calculate_competitor_score(video_analysis_id)
@@ -388,7 +388,7 @@ def detect_threats(video_analysis_id: str) -> dict:
                 "severity": "high" if share_ratio > 1.0 else "medium",
                 "title": f"病毒式传播优势",
                 "description": f"转发与点赞比率达 {share_ratio:.2f}，表明内容被大量转发，形成了超出粉丝基数的病毒式传播。",
-                "evidence": f"total_shares={total_shares}, total_likes={total_likes}",
+                "evidence": f"总转发={total_shares}, 总点赞={total_likes}",
                 "confidence_score": 0.9,
                 "impact": "high",
             })
@@ -412,7 +412,7 @@ def detect_threats(video_analysis_id: str) -> dict:
                 "severity": "high" if spike_ratio > 5 else "medium",
                 "title": f"互动量激增（{spike_ratio:.1f}倍于均值）",
                 "description": f"最高互动视频总互动量达 {top_engagement}，是账号平均值的 {spike_ratio:.1f} 倍。该内容模式可能具有可复制性。",
-                "evidence": f"top_video_engagement={top_engagement}, avg={avg_engagement:.0f}",
+                "evidence": f"最高视频互动={top_engagement}, 平均={avg_engagement:.0f}",
                 "confidence_score": 0.85,
                 "impact": "high",
             })
@@ -424,7 +424,7 @@ def detect_threats(video_analysis_id: str) -> dict:
             "severity": "medium",
             "title": f"高内容产出速度（{len(videos)}条视频）",
             "description": f"该账号保持高频率发布，近期有 {len(videos)} 条视频，显示出积极的内容生产管线。",
-            "evidence": f"video_count={len(videos)}",
+            "evidence": f"视频数={len(videos)}",
             "confidence_score": 0.8,
             "impact": "medium",
         })
@@ -439,7 +439,7 @@ def detect_threats(video_analysis_id: str) -> dict:
                 "severity": "high" if efficiency > 1000 else "medium",
                 "title": f"高互动效率（每万粉丝 {efficiency:.0f} 互动）",
                 "description": f"平均互动量 {avg_engagement:.0f}，粉丝数仅 {follower_count}，显示出极高的内容转化效率。",
-                "evidence": f"avg_engagement={avg_engagement:.0f}, followers={follower_count}",
+                "evidence": f"平均互动={avg_engagement:.0f}, 粉丝数={follower_count}",
                 "confidence_score": 0.75,
                 "impact": "high",
             })
@@ -452,7 +452,7 @@ def detect_threats(video_analysis_id: str) -> dict:
             "severity": "medium",
             "title": f"稳定的发布策略",
             "description": f"发布时间高度一致（评分: {consistency}/100），表明有纪律性的内容日历，竞争对手可能难以匹敌。",
-            "evidence": f"consistency_score={consistency}",
+            "evidence": f"一致性评分={consistency}",
             "confidence_score": 0.7,
             "impact": "medium",
         })
@@ -497,7 +497,7 @@ def generate_counter_strategy(video_analysis_id: str) -> dict:
     if not va:
         raise ValueError(f"Analysis not found: {video_analysis_id}")
 
-    account_name = va.get("account_name") or "Unknown"
+    account_name = va.get("account_name") or "未知账号"
 
     # Get score and threats
     score_data = calculate_competitor_score(video_analysis_id)
@@ -533,7 +533,7 @@ def generate_counter_strategy(video_analysis_id: str) -> dict:
             "analysis_id": video_analysis_id,
             "account_name": account_name,
             "counter_strategies": [],
-            "ai_provider": "none",
+            "ai_provider": "无",
         }
 
     brief_json = json.dumps(brief, ensure_ascii=False, indent=2)
@@ -609,6 +609,6 @@ def generate_counter_strategy(video_analysis_id: str) -> dict:
         "analysis_id": video_analysis_id,
         "account_name": account_name,
         "counter_strategies": [],
-        "overall_approach": "AI analysis unavailable",
-        "ai_provider": "none",
+        "overall_approach": "AI 分析不可用",
+        "ai_provider": "无",
     }
