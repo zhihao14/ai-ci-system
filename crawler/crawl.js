@@ -140,26 +140,13 @@ async function crawlDouyinVideos(shareUrl) {
 
   const page = await context.newPage();
 
-  // 3. 访问抖音首页获取 cookie
-  console.error(`[crawler] 预访问抖音首页获取 cookie...`);
-  try {
-    await page.goto("https://www.douyin.com/", {
-      waitUntil: "domcontentloaded",
-      timeout: 10000,
-    });
-    await page.waitForTimeout(3000);
-    console.error(`[crawler] 首页加载完成`);
-  } catch (e) {
-    console.error(`[crawler] 预访问首页失败, 继续: ${e.message}`);
-  }
-
-  // 4. 导航到用户主页触发 JS 加载
+  // 3. 直接导航到用户主页 (获取 cookie + 触发 JS)
   const profileUrl = `https://www.douyin.com/user/${secUid}`;
   console.error(`[crawler] 导航到用户主页...`);
   try {
     await page.goto(profileUrl, {
       waitUntil: "domcontentloaded",
-      timeout: 15000,
+      timeout: 20000,
     });
     await page.waitForTimeout(3000);
   } catch (e) {
