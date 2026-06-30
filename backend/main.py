@@ -452,3 +452,120 @@ def intelligence_dashboard():
     """Real-time Analytics Dashboard 统计数据"""
     from intelligence_service import get_intelligence_dashboard
     return get_intelligence_dashboard()
+
+
+@app.post("/api/intelligence/init-db")
+def init_intelligence_db():
+    """临时端点: 执行数据库迁移 (创建智能分析模块的6张表)
+
+    尝试多种方法:
+    1. psycopg2 直连 PostgreSQL (需要 DATABASE_URL 或数据库密码)
+    2. Supabase pg-meta HTTP API
+    3. 返回 SQL 供手动执行
+    """
+    import os
+    from pathlib import Path
+
+    # 读取 SQL 文件
+    sql_path = Path(__file__).parent.parent / "db" / "schema_intelligence.sql"
+    if not sql_path.exists():
+        raise HTTPException(status_code=500, detail=f"SQL 文件不存在: {sql_path}")
+    sql = sql_path.read_text()
+
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+
+    # 收集可能的数据库连接信息
+    db_url = (
+        os.getenv("DATABASE_URL")
+        or os.getenv("SUPABASE_DB_URL")
+        or os.getenv("POSTGRES_URL")
+        or os.getenv("DB_URL")
+    )
+    db_password = (
+        os.getenv("DATABASE_PASSWORD")
+        or os.getenv("POSTGRES_PASSWORD")
+        or os.getenv("SUPABASE_DB_PASSWORD")
+    )
+
+    errors = []
+
+    # ---- Method 1: psycopg2 直连 ----
+    try:
+        import psycopg2
+
+        conn_str = db_url
+        # 如果没有 DATABASE_URL, 尝试从 SUPABASE_URL 构造
+        if not conn_str and supabase_url and db_password:
+            # 提取 project ref: https://abcdef.supabase.co -> abcdef
+            project_ref = supabase_url.replace("https://", "").replace("http://", "").split(".")[0]
+            conn_str = f"postgresql://postgres:{db_password}@db.{project_ref}.supabase.co:5432/postgres"
+
+        if conn_str:
+            conn = psycopg2.connect(conn_str)
+            conn.autocommit = True
+            cur = conn.cursor()
+            cur.execute(sql)
+            cur.close()
+            conn.close()
+            return {"status": "success", "method": "psycopg2", "message": "6张表创建成功"}
+
+    except ImportError:
+        errors.append("psycopg2 未安装")
+    except Exception as e:
+        errors.append(f"psycopg2: {str(e)[:200]}")
+
+    # ---- Method 2: Supabase pg-meta HTTP API ----
+    if supabase_url and supabase_key:
+        try:
+            import httpx
+
+            # 尝试 /pg/query 端点
+            resp = httpx.post(
+                f"{supabase_url}/pg/query",
+                headers={
+                    "apikey": supabase_key,
+                    "Authorization": f"Bearer {supabase_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"query": sql},
+                timeout=30.0,
+            )
+            if resp.status_code == 200:
+                return {"status": "success", "method": "pg-meta", "message": "6张表创建成功"}
+
+            # 尝试 Management API
+            project_ref = supabase_url.replace("https://", "").replace("http://", "").split(".")[0]
+            resp2 = httpx.post(
+                f"https://api.supabase.com/v1/projects/{project_ref}/database/query",
+                headers={
+                    "Authorization": f"Bearer {supabase_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"query": sql},
+                timeout=30.0,
+            )
+            if resp2.status_code == 200:
+                return {"status": "success", "method": "management-api", "message": "6张表创建成功"}
+
+            errors.append(f"pg-meta HTTP: status={resp.status_code}")
+            errors.append(f"management-api HTTP: status={resp2.status_code}")
+
+        except Exception as e:
+            errors.append(f"HTTP API: {str(e)[:200]}")
+
+    # ---- Method 3: 返回诊断信息 + SQL ----
+    relevant_vars = sorted([
+        k for k in os.environ.keys()
+        if any(x in k.upper() for x in ["DB", "SQL", "POSTGRES", "SUPABASE", "DATABASE"])
+    ])
+
+    return {
+        "status": "manual_required",
+        "message": "无法自动执行迁移, 请手动在 Supabase SQL Editor 中执行 db/schema_intelligence.sql",
+        "errors": errors,
+        "relevant_env_vars": relevant_vars,
+        "db_url_found": bool(db_url),
+        "db_password_found": bool(db_password),
+        "sql_lines": sql.count("\n") + 1,
+    }
