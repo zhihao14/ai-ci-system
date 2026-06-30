@@ -53,7 +53,7 @@ def run_crawler(url: str) -> dict:
     try:
         proc = subprocess.run(
             ["node", CRAWLER_SCRIPT, url],
-            capture_output=True, text=True, timeout=90,
+            capture_output=True, text=True, timeout=180,
         )
         stdout = proc.stdout.strip()
         if not stdout:
@@ -197,6 +197,8 @@ def growth_analysis(req: GrowthAnalysisRequest):
 
     # 获取结构化字段 (抖音爬虫返回, 其他来源可能没有)
     account_fields = crawled.get("account_fields")
+    # 获取视频列表 (Playwright Network Intercept 抓取)
+    videos = crawled.get("videos") or req.videos
 
     # 2) AI 增长策略分析
     result = growth_analyze(content, videos, account_fields)
@@ -212,6 +214,8 @@ def growth_analysis(req: GrowthAnalysisRequest):
         "title": title,
         "account_info": content,
         "account_fields": account_fields,
+        "videos": videos,
+        "video_count": len(videos) if videos else 0,
         "analysis": result,
         "ai_provider": result.get("ai_provider"),
     }
