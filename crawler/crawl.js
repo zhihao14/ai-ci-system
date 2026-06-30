@@ -1,5 +1,5 @@
 // crawl.js - 短视频数据爬虫
-// 策略: Playwright Network Intercept 捕获抖音 API 真实响应
+// 策略: Playwright 页面内 fetch 捕获抖音 API 真实响应
 //
 // 用法: node crawl.js <url>
 // 输出: JSON to stdout
@@ -8,7 +8,7 @@ const url = process.argv[2];
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 // ============================================================
-// 抖音视频列表爬虫 (Playwright Network Intercept)
+// 抖音视频列表爬虫
 // ============================================================
 
 /**
@@ -94,12 +94,12 @@ function extractVideosFromResponse(jsonData) {
 }
 
 /**
- * 使用 Playwright 拦截抖音视频列表 API
+ * 使用 Playwright 在页面 context 内 fetch API
  * 策略:
- * 1. 打开抖音用户主页
- * 2. 设置 network intercept 捕获 /aweme/v1/web/aweme/post/ 响应
- * 3. 自动滚动触发分页加载
- * 4. 收集足够视频后返回
+ * 1. 访问抖音首页获取 cookie (ttwid, msToken)
+ * 2. 导航到用户主页触发 JS 加载
+ * 3. 在页面 context 内 fetch 视频列表 API (带 cookie + 签名)
+ * 4. 如果有更多, 继续翻页
  */
 async function crawlDouyinVideos(shareUrl) {
   const { chromium } = await import("playwright");
@@ -132,267 +132,64 @@ async function crawlDouyinVideos(shareUrl) {
 
   // 注入反检测脚本
   await context.addInitScript(() => {
-    // 隐藏 webdriver 标志
     Object.defineProperty(navigator, "webdriver", { get: () => false });
-    // 模拟真实插件
-    Object.defineProperty(navigator, "plugins", {
-      get: () => [1, 2, 3, 4, 5],
-    });
-    // 模拟真实语言
-    Object.defineProperty(navigator, "languages", {
-      get: () => ["zh-CN", "zh", "en"],
-    });
-    // 伪装 chrome 对象
+    Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
+    Object.defineProperty(navigator, "languages", { get: () => ["zh-CN", "zh", "en"] });
     window.chrome = { runtime: {} };
   });
 
   const page = await context.newPage();
 
-  // 3a. 先访问抖音首页获取 cookie (ttwid, msToken 等)
+  // 3. 访问抖音首页获取 cookie
   console.error(`[crawler] 预访问抖音首页获取 cookie...`);
   try {
     await page.goto("https://www.douyin.com/", {
-      waitUntil: "networkidle",
-      timeout: 20000,
+      waitUntil: "domcontentloaded",
+      timeout: 15000,
     });
     await page.waitForTimeout(5000);
-    console.error(`[crawler] 首页加载完成, cookie 已获取`);
+    console.error(`[crawler] 首页加载完成`);
   } catch (e) {
     console.error(`[crawler] 预访问首页失败, 继续: ${e.message}`);
   }
 
-  // 3b. 监听所有网络请求 (调试用, 找到真实的 API)
-  const apiUrls = new Set();
-  page.on("request", (request) => {
-    const u = request.url();
-    if (u.includes("aweme") && u.includes("post")) {
-      apiUrls.add(u.substring(0, 120));
-      console.error(`[crawler] [REQ] ${u.substring(0, 150)}`);
-    }
-  });
-
-  // 3c. 设置 Network Intercept 捕获视频列表 API
-  const allVideos = [];
-  const videoApiResponse = { has_more: true, max_cursor: 0 };
-  let apiCallCount = 0;
-
-  page.on("response", async (response) => {
-    const reqUrl = response.url();
-    // 匹配视频列表 API
-    if (reqUrl.includes("/aweme/v1/web/aweme/post/") || reqUrl.includes("/aweme/v1/aweme/post/")) {
-      try {
-        // 尝试多种方式获取响应体
-        let text = "";
-        try {
-          text = await response.text();
-        } catch {
-          // response.text() 失败, 尝试 body()
-          try {
-            const buf = await response.body();
-            text = buf.toString("utf-8");
-          } catch {
-            console.error(`[crawler] API 响应体无法读取 (status=${response.status()})`);
-            return;
-          }
-        }
-
-        if (!text || text.length < 10) {
-          console.error(`[crawler] API 响应为空 (status=${response.status()}, length=${text.length})`);
-          // 尝试从页面 JS context 直接 fetch
-          return;
-        }
-        const body = JSON.parse(text);
-        apiCallCount++;
-        console.error(`[crawler] 捕获 API 响应 #${apiCallCount}, aweme_list: ${body.aweme_list?.length || 0} 条`);
-
-        const extracted = extractVideosFromResponse(body);
-        // 去重 (按 aweme_id)
-        for (const v of extracted) {
-          if (!allVideos.find((x) => x.aweme_id === v.aweme_id)) {
-            allVideos.push(v);
-          }
-        }
-
-        // 更新分页状态
-        videoApiResponse.has_more = body.has_more === true || body.has_more === 1;
-        videoApiResponse.max_cursor = body.max_cursor || 0;
-      } catch (e) {
-        console.error(`[crawler] 解析 API 响应失败: ${e.message} (status=${response.status()})`);
-      }
-    }
-  });
-
-  // 4. 导航到用户主页
+  // 4. 导航到用户主页触发 JS 加载
   const profileUrl = `https://www.douyin.com/user/${secUid}`;
-  console.error(`[crawler] 导航到: ${profileUrl.substring(0, 60)}...`);
-
+  console.error(`[crawler] 导航到用户主页...`);
   try {
     await page.goto(profileUrl, {
       waitUntil: "domcontentloaded",
-      timeout: 30000,
+      timeout: 20000,
     });
+    await page.waitForTimeout(5000);
   } catch (e) {
-    console.error(`[crawler] 导航超时, 继续尝试拦截: ${e.message}`);
+    console.error(`[crawler] 用户主页导航超时, 继续尝试: ${e.message}`);
   }
 
-  // 等待页面初始加载 (抖音 SPA 需要时间渲染)
-  await page.waitForTimeout(5000);
-
-  // 检测是否出现验证码
-  const pageText = await page.evaluate(() => document.body?.innerText?.substring(0, 500) || "");
-  if (pageText.includes("验证") || pageText.includes("安全验证") || pageText.includes("captcha")) {
-    console.error(`[crawler] 检测到验证码页面, 尝试等待通过...`);
-    await page.waitForTimeout(10000);
-  }
-
-  // 检测登录弹窗并关闭
-  try {
-    const closeBtn = await page.$('[class*="close"][class*="icon"], [class*="dy-account-close"], button:has-text("关闭")');
-    if (closeBtn) {
-      await closeBtn.click({ timeout: 2000 });
-      console.error(`[crawler] 关闭登录弹窗`);
-      await page.waitForTimeout(1000);
-    }
-  } catch {}
-
-  // 5. 尝试点击"作品" tab (确保在作品页面)
-  try {
-    const tabSelectors = [
-      'div[data-key="user_post_list"]',
-      'span:has-text("作品")',
-      'div.tab:has-text("作品")',
-      '[class*="tab"][class*="active"]',
-      'a:has-text("作品")',
-    ];
-    for (const sel of tabSelectors) {
-      try {
-        const el = await page.$(sel);
-        if (el) {
-          await el.click({ timeout: 3000 });
-          console.error(`[crawler] 点击作品 tab: ${sel}`);
-          await page.waitForTimeout(3000);
-          break;
-        }
-      } catch {}
-    }
-  } catch {}
-
-  // 6. 自动滚动加载更多视频
+  // 5. 在页面 context 内 fetch 视频列表 API
+  const allVideos = [];
   const TARGET_VIDEO_COUNT = 20;
-  const MAX_SCROLL_ATTEMPTS = 20;
-  let scrollAttempts = 0;
-  let lastVideoCount = 0;
-  let noChangeCount = 0;
+  let maxCursor = 0;
+  let hasMore = true;
+  let pageCount = 0;
 
-  console.error(`[crawler] 开始滚动加载, 目标: ${TARGET_VIDEO_COUNT} 条视频`);
+  console.error(`[crawler] 开始页面内 fetch API, 目标: ${TARGET_VIDEO_COUNT} 条`);
 
-  while (allVideos.length < TARGET_VIDEO_COUNT && scrollAttempts < MAX_SCROLL_ATTEMPTS) {
-    scrollAttempts++;
-    lastVideoCount = allVideos.length;
-
-    // 模拟人类滚动: 先慢滚再快滚
-    await page.evaluate(async () => {
-      await new Promise((resolve) => {
-        let total = 0;
-        const step = 300 + Math.random() * 200;
-        const timer = setInterval(() => {
-          window.scrollBy(0, step);
-          total += step;
-          if (total >= 800 + Math.random() * 400) {
-            clearInterval(timer);
-            resolve();
-          }
-        }, 100);
-      });
-    });
-
-    // 等待 API 响应
-    await page.waitForTimeout(2500 + Math.random() * 1500);
-
-    console.error(
-      `[crawler] 滚动 #${scrollAttempts}: 已获取 ${allVideos.length}/${TARGET_VIDEO_COUNT} 条视频`
-    );
-
-    // 检测是否还有新数据
-    if (allVideos.length === lastVideoCount) {
-      noChangeCount++;
-      if (noChangeCount >= 5) {
-        console.error(`[crawler] 连续 ${noChangeCount} 次无新数据, 停止滚动`);
-        break;
-      }
-    } else {
-      noChangeCount = 0;
-    }
-
-    // 检测是否还有更多
-    if (!videoApiResponse.has_more) {
-      console.error(`[crawler] API 返回 has_more=false, 停止滚动`);
-      break;
-    }
-  }
-
-  await browser.close();
-
-  // 7. 截取目标数量
-  let videos = allVideos.slice(0, TARGET_VIDEO_COUNT);
-
-  // 7a. 如果 Network Intercept 未获取到视频, 尝试在页面 context 内 fetch
-  if (videos.length === 0) {
-    console.error(`[crawler] Network Intercept 未获取到视频, 尝试页面内直接 fetch API...`);
-    // 重新打开页面 (browser 已关闭)
-    const browser2 = await chromium.launch({
-      headless: true,
-      args: [
-        "--disable-blink-features=AutomationControlled",
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-      ],
-    });
-    const context2 = await browser2.newContext({
-      userAgent: UA,
-      viewport: { width: 1920, height: 1080 },
-      locale: "zh-CN",
-      timezoneId: "Asia/Shanghai",
-    });
-    await context2.addInitScript(() => {
-      Object.defineProperty(navigator, "webdriver", { get: () => false });
-      window.chrome = { runtime: {} };
-    });
-    const page2 = await context2.newPage();
-
-    // 访问首页获取 cookie
+  while (allVideos.length < TARGET_VIDEO_COUNT && hasMore && pageCount < 3) {
+    pageCount++;
     try {
-      await page2.goto("https://www.douyin.com/", { waitUntil: "domcontentloaded", timeout: 20000 });
-      await page2.waitForTimeout(8000);
-    } catch (e) {
-      console.error(`[crawler] 预访问首页失败: ${e.message}`);
-    }
-
-    // 导航到用户主页触发 JS 加载
-    const profileUrl2 = `https://www.douyin.com/user/${secUid}`;
-    try {
-      await page2.goto(profileUrl2, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page2.waitForTimeout(8000);
-    } catch (e) {
-      console.error(`[crawler] 用户主页导航超时: ${e.message}`);
-    }
-
-    // 在页面 context 内 fetch (带 cookie + 签名)
-    try {
-      console.error(`[crawler] 在页面 context 内直接调用 API...`);
-      const apiResult = await page2.evaluate(async (secUidVal) => {
-        const params = new URLSearchParams({
+      const apiResult = await page.evaluate(async (params) => {
+        const searchParams = new URLSearchParams({
           device_platform: "webapp",
           aid: "6383",
           channel: "channel_pc_web",
-          sec_user_id: secUidVal,
-          max_cursor: "0",
+          sec_user_id: params.secUid,
+          max_cursor: String(params.cursor),
           count: "20",
           version_code: "170400",
           version_name: "17.4.0",
         });
-        const apiUrl = `https://www.douyin.com/aweme/v1/web/aweme/post/?${params.toString()}`;
+        const apiUrl = `https://www.douyin.com/aweme/v1/web/aweme/post/?${searchParams.toString()}`;
         const resp = await fetch(apiUrl, {
           method: "GET",
           credentials: "include",
@@ -400,34 +197,39 @@ async function crawlDouyinVideos(shareUrl) {
         });
         const text = await resp.text();
         return { status: resp.status, text, length: text.length };
-      }, secUid);
+      }, { secUid, cursor: maxCursor });
 
-      console.error(`[crawler] 页面内 fetch 结果: status=${apiResult.status}, length=${apiResult.length}`);
+      console.error(`[crawler] fetch #${pageCount}: status=${apiResult.status}, length=${apiResult.length}`);
 
       if (apiResult.text && apiResult.text.length > 10) {
-        try {
-          const body = JSON.parse(apiResult.text);
-          const extracted = extractVideosFromResponse(body);
-          for (const v of extracted) {
-            if (!videos.find((x) => x.aweme_id === v.aweme_id)) {
-              videos.push(v);
-            }
+        const body = JSON.parse(apiResult.text);
+        const extracted = extractVideosFromResponse(body);
+        // 去重
+        for (const v of extracted) {
+          if (!allVideos.find((x) => x.aweme_id === v.aweme_id)) {
+            allVideos.push(v);
           }
-          console.error(`[crawler] 页面内 fetch 获取 ${extracted.length} 条视频`);
-        } catch (e) {
-          console.error(`[crawler] 页面内 fetch 结果解析失败: ${e.message}`);
         }
+        hasMore = body.has_more === true || body.has_more === 1;
+        maxCursor = body.max_cursor || 0;
+        console.error(`[crawler] 获取 ${extracted.length} 条, 累计 ${allVideos.length}/${TARGET_VIDEO_COUNT}, has_more=${hasMore}`);
+      } else {
+        console.error(`[crawler] API 响应为空, 停止`);
+        break;
       }
     } catch (e) {
-      console.error(`[crawler] 页面内 fetch 失败: ${e.message}`);
+      console.error(`[crawler] fetch 失败: ${e.message}`);
+      break;
     }
-
-    await browser2.close();
   }
 
-  console.error(`[crawler] 最终获取 ${videos.length} 条视频 (共 ${apiCallCount} 次 API 调用)`);
+  await browser.close();
 
-  // 8. 构造账号信息文本
+  // 6. 截取目标数量
+  const videos = allVideos.slice(0, TARGET_VIDEO_COUNT);
+  console.error(`[crawler] 最终获取 ${videos.length} 条视频`);
+
+  // 7. 构造账号信息文本
   const content = [
     `账号名称: ${accountFields.nickname}`,
     `抖音号: ${accountFields.unique_id || "未知"}`,
