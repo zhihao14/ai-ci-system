@@ -174,65 +174,121 @@ def analyze(title: str, content: str) -> dict:
 
 
 # ============================================================
-# 短视频增长策略分析 (4层框架)
+# 短视频增长策略分析 (evidence-based 聚合分析)
 # ============================================================
 
 GROWTH_SYSTEM_PROMPT = (
-    "你是顶级短视频增长策略分析师 + TikTok/Douyin投流专家。"
-    "你不能只是总结内容，你必须输出可执行增长策略。"
+    "你是一个严格基于数据的短视频内容分析师。"
+    "你的唯一职责是对提供的账号信息和视频数据进行聚合统计与事实性分析。"
+    "\n\n【绝对禁止】以下行为:\n"
+    "1. 禁止推测用户心理、情绪、动机\n"
+    "2. 禁止编造传播模型或抽象理论框架\n"
+    "3. 禁止虚构未提供的视频标题、数据或内容\n"
+    "4. 禁止基于账号简介推测视频内容特征\n"
+    "5. 如果某项分析所需的数据字段不存在或为空, 必须输出 '数据不足，无法判断'\n"
+    "\n每一条结论必须附带:\n"
+    "- confidence_score: 0.0-1.0 (1.0=直接从数据计算, 0.5=部分数据支撑, 无法计算时该字段为null)\n"
+    "- evidence_fields: 支撑该结论的具体数据字段名数组 (如 ['digg_count','comment_count'])\n"
     "请以严格 JSON 格式输出，不要输出任何额外文字或 Markdown 代码块。"
 )
 
 GROWTH_JSON_SCHEMA = """{
-  "layer1_content_structure": {
-    "videos": [
+  "data_completeness": "full | partial | insufficient",
+  "raw_data_summary": {
+    "has_account_info": true,
+    "has_video_data": true,
+    "video_count": 0,
+    "available_video_fields": ["实际存在的字段名, 如 title/desc/digg_count/create_time 等"],
+    "missing_video_fields": ["缺失的字段名"]
+  },
+  "aggregate_analysis": {
+    "high_frequency_keywords": [
       {
-        "index": 1,
-        "hook": "前3秒Hook结构分析",
-        "content_pattern": "内容模式分类(如:知识科普/剧情反转/热点追踪/情感共鸣/产品种草)",
-        "emotion_type": "情绪类型(如:好奇/共鸣/愤怒/惊喜/焦虑/信任)",
-        "pacing": "节奏分析(快切/慢叙/递进/对比)",
-        "conversion": "转化方式(关注/点赞/评论/转发/购买/收藏)"
+        "keyword": "从视频标题/描述中提取的实际高频词",
+        "occurrence_count": 0,
+        "confidence_score": 1.0,
+        "evidence_fields": ["title", "desc"]
+      }
+    ],
+    "engagement_ranking": [
+      {
+        "rank": 1,
+        "video_title": "实际视频标题",
+        "total_engagement": 0,
+        "digg_count": 0,
+        "comment_count": 0,
+        "share_count": 0,
+        "confidence_score": 1.0,
+        "evidence_fields": ["digg_count", "comment_count", "share_count"]
+      }
+    ],
+    "posting_time_pattern": {
+      "peak_hours": ["实际统计出的高频发布时段, 如 18:00-20:00"],
+      "weekday_distribution": {"周一": 0, "周二": 0},
+      "confidence_score": 1.0,
+      "evidence_fields": ["create_time"],
+      "status": "数据充足已计算 | 数据不足，无法判断"
+    },
+    "like_comment_ratio": {
+      "average_ratio": 0.0,
+      "min_ratio": 0.0,
+      "max_ratio": 0.0,
+      "confidence_score": 1.0,
+      "evidence_fields": ["digg_count", "comment_count"],
+      "status": "数据充足已计算 | 数据不足，无法判断"
+    },
+    "top_content_types": [
+      {
+        "content_type": "基于标题关键词的实际分类",
+        "video_count": 0,
+        "avg_engagement": 0.0,
+        "confidence_score": 0.8,
+        "evidence_fields": ["title", "digg_count"]
       }
     ]
   },
-  "layer2_viral_mechanism": {
-    "why_viral": "为什么它会火(一句话核心原因)",
-    "spread_model": "传播机制模型名称(如:社交货币模型/情绪共振模型/信息差套利模型/身份认同模型/实用价值模型)",
-    "model_explanation": "该模型的底层逻辑抽象说明(2-3句)",
-    "key_triggers": ["触发传播的关键要素1", "触发传播的关键要素2"]
-  },
-  "layer3_data_trends": {
-    "growing_content": ["正在增长的内容类型"],
-    "declining_content": ["正在下降的内容类型"],
-    "is_exploding": true/false,
-    "explosion_reason": "是否进入爆发期的判断依据"
-  },
-  "layer4_strategy": {
-    "replicable_topics": [
-      {"topic": "选题方向", "angle": "切入角度", "expected_hook": "预期Hook设计"}
-    ],
-    "next_7_days_direction": ["未来7天内容方向1", "未来7天内容方向2"],
-    "should_not_do": ["不应该做的事情1", "不应该做的事情2"],
-    "growth_opportunities": ["增长机会点1", "增长机会点2"]
-  }
+  "actionable_insights": [
+    {
+      "insight": "仅基于已验证数据的结论",
+      "confidence_score": 0.9,
+      "evidence_fields": ["具体字段"],
+      "supporting_data": "引用的具体数值或事实"
+    }
+  ]
 }"""
 
 
 def build_growth_prompt(account_info: str, videos: list[dict] | None = None) -> str:
-    """构造短视频增长策略分析的 user prompt"""
-    videos_text = "暂无视频数据,请基于账号信息推断其内容模式"
-    if videos:
+    """构造 evidence-based 聚合分析 prompt"""
+    # 明确列出可用数据, 让 AI 知道边界
+    has_videos = bool(videos and len(videos) > 0)
+    video_count = len(videos) if videos else 0
+
+    if has_videos:
+        available_fields = set()
+        for v in videos:
+            available_fields.update(v.keys())
+        fields_str = ", ".join(sorted(available_fields)) or "无"
+        missing_str = ""
+    else:
+        available_fields = set()
+        fields_str = "无视频数据"
+        missing_str = "title, desc, digg_count, comment_count, share_count, play_count, create_time"
+
+    # 构造视频数据文本
+    videos_text = "无视频数据"
+    if has_videos:
         lines = []
         for i, v in enumerate(videos, 1):
             lines.append(
                 f"视频{i}: 标题={v.get('title','')} 描述={v.get('desc','')} "
                 f"点赞={v.get('digg_count','')} 评论={v.get('comment_count','')} "
-                f"转发={v.get('share_count','')} 播放={v.get('play_count','')}"
+                f"转发={v.get('share_count','')} 播放={v.get('play_count','')} "
+                f"发布时间={v.get('create_time','')}"
             )
         videos_text = "\n".join(lines)
 
-    return f"""请对以下短视频账号进行4层增长策略分析。
+    return f"""请对以下短视频账号进行 evidence-based 聚合分析。
 
 【账号信息】
 {account_info}
@@ -240,14 +296,25 @@ def build_growth_prompt(account_info: str, videos: list[dict] | None = None) -> 
 【视频数据】
 {videos_text}
 
+【数据可用性】
+- 账号信息: {'有' if account_info.strip() else '无'}
+- 视频数据: {'有, 共' + str(video_count) + '条' if has_videos else '无'}
+- 视频可用字段: {fields_str}
+- 视频缺失字段: {missing_str or '无'}
+
 请严格按照以下JSON Schema输出(只输出JSON,不要任何额外文字):
 {GROWTH_JSON_SCHEMA}
 
-注意:
-- layer1的videos数组: 如果有视频数据就逐条分析,没有就基于账号定位生成2-3条典型视频结构推断
-- layer2必须抽象成模型(如"社交货币模型"),不要只描述现象
-- layer3基于已有数据判断趋势,数据不足时给出方向性判断
-- layer4必须输出3个可复制选题,每个含选题/角度/Hook设计
+【核心规则】
+1. data_completeness: 有视频数据=full/partial, 无视频数据=insufficient
+2. 所有视频级指标(high_frequency_keywords/engagement_ranking/posting_time_pattern/like_comment_ratio/top_content_types):
+   - 有视频数据时: 从实际数据计算, confidence_score=1.0
+   - 无视频数据时: 对应字段填 status="数据不足，无法判断", confidence_score=null, 其余数值字段填null
+3. actionable_insights: 只输出有数据支撑的结论, 每条必须引用具体数值
+4. 禁止输出任何心理分析、传播模型、情绪推测
+5. high_frequency_keywords: 从视频标题/描述中提取出现>=2次的词, 无视频数据时返回空数组
+6. engagement_ranking: 按总互动量(点赞+评论+转发)降序排列, 无视频数据时返回空数组
+7. 如果只有账号信息没有视频数据, actionable_insights 只能基于账号级别的数值(粉丝数/获赞数/作品数)输出
 """
 
 
@@ -262,7 +329,7 @@ def _openai_compatible_growth(cfg: dict, account_info: str, videos: list[dict] |
             {"role": "system", "content": GROWTH_SYSTEM_PROMPT},
             {"role": "user", "content": build_growth_prompt(account_info, videos)},
         ],
-        "temperature": 0.4,
+        "temperature": 0.1,
         "response_format": {"type": "json_object"},
     }
     with httpx.Client(timeout=90.0) as client:
@@ -278,7 +345,7 @@ def _claude_growth(cfg: dict, account_info: str, videos: list[dict] | None) -> d
     ac = Anthropic(api_key=cfg["api_key"])
     msg = ac.messages.create(
         model=cfg["model"],
-        max_tokens=3000,
+        max_tokens=4000,
         system=GROWTH_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": build_growth_prompt(account_info, videos)}],
     )
@@ -287,13 +354,13 @@ def _claude_growth(cfg: dict, account_info: str, videos: list[dict] | None) -> d
 
 
 def growth_analyze(account_info: str, videos: list[dict] | None = None) -> dict:
-    """增长策略分析主入口: 按优先级尝试 AI 供应商
+    """增长策略分析主入口: evidence-based 聚合分析
 
     参数:
         account_info: 账号信息文本(爬虫抓取的content)
         videos: 可选的视频数据列表(含title/desc/digg_count等)
 
-    返回: 4层结构化分析结果 + ai_provider 字段
+    返回: 结构化分析结果 + ai_provider 字段
     """
     configs = _get_configs()
 

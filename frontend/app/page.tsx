@@ -106,7 +106,7 @@ export default function Home() {
             href="/growth"
             className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
           >
-            增长策略分析
+            数据分析
           </a>
           <a
             href="/settings"
