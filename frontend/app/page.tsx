@@ -10,6 +10,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -120,6 +121,7 @@ const threatLevelColors: Record<string, string> = {
 };
 
 export default function DashboardHomePage() {
+  const { t } = useI18n();
   const [analyses, setAnalyses] = useState<AnalysisItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(true);
@@ -275,9 +277,9 @@ export default function DashboardHomePage() {
       {/* Header */}
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Intelligence Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("dashboard.title")}</h1>
           <p className="mt-0.5 text-sm text-slate-500">
-            Real-time competitive intelligence · Score · Threats · Counter-strategies
+            {t("dashboard.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -288,7 +290,7 @@ export default function DashboardHomePage() {
           >
             {analyses.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.account_name || "Unknown"} · {a.video_count ?? 0} videos
+                {a.account_name || "Unknown"} · {a.video_count ?? 0} {t("common.videos")}
               </option>
             ))}
           </select>
@@ -296,7 +298,7 @@ export default function DashboardHomePage() {
             href="/intelligence"
             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
           >
-            + New Analysis
+            {t("dashboard.newAnalysis")}
           </Link>
         </div>
       </header>
@@ -304,7 +306,7 @@ export default function DashboardHomePage() {
       {/* Analysis list loading */}
       {loadingList && (
         <div className="flex h-64 items-center justify-center">
-          <div className="animate-pulse text-sm text-slate-400">Loading analyses...</div>
+          <div className="animate-pulse text-sm text-slate-400">{t("dashboard.loadingAnalyses")}</div>
         </div>
       )}
 
@@ -312,9 +314,9 @@ export default function DashboardHomePage() {
       {!loadingList && analyses.length === 0 && (
         <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white">
           <div className="text-center">
-            <p className="text-sm text-slate-400">No analyses yet</p>
+            <p className="text-sm text-slate-400">{t("dashboard.noAnalyses")}</p>
             <Link href="/intelligence" className="mt-2 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-700">
-              Start your first analysis →
+              {t("dashboard.startFirst")}
             </Link>
           </div>
         </div>
@@ -329,7 +331,7 @@ export default function DashboardHomePage() {
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white shadow-lg">
               <div className="mb-2 flex items-center gap-2">
                 <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
-                  Executive Summary
+                  {t("dashboard.executiveSummary")}
                 </span>
                 {execSummary?.ai_provider && execSummary.ai_provider !== "none" && (
                   <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
@@ -362,7 +364,7 @@ export default function DashboardHomePage() {
                   )}
                   {execSummary.recommendation && (
                     <div className="mt-4 border-l-2 border-indigo-400 pl-3">
-                      <p className="text-xs text-slate-400">Strategic Recommendation</p>
+                      <p className="text-xs text-slate-400">{t("dashboard.strategicRecommendation")}</p>
                       <p className="mt-1 text-sm font-medium text-indigo-200">{execSummary.recommendation}</p>
                     </div>
                   )}
@@ -375,7 +377,7 @@ export default function DashboardHomePage() {
             {/* Score Gauge */}
             <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <span className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
-                Competitor Score
+                {t("dashboard.competitorScore")}
               </span>
               {loadingScore ? (
                 <div className="flex h-32 w-32 items-center justify-center">
@@ -398,7 +400,7 @@ export default function DashboardHomePage() {
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             {/* Radar Chart */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-bold text-slate-900">Radar Analytics</h3>
+              <h3 className="mb-4 text-sm font-bold text-slate-900">{t("dashboard.radarAnalytics")}</h3>
               {score ? (
                 <ResponsiveContainer width="100%" height={260}>
                   <RadarChart data={radarData}>
@@ -416,14 +418,14 @@ export default function DashboardHomePage() {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-52 items-center justify-center text-sm text-slate-400">
-                  {loadingScore ? "Calculating scores..." : "No data"}
+                  {loadingScore ? t("dashboard.loadingAnalyses") : t("common.noData")}
                 </div>
               )}
             </div>
 
             {/* Dimension Bars */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-bold text-slate-900">Dimension Breakdown</h3>
+              <h3 className="mb-4 text-sm font-bold text-slate-900">{t("dashboard.dimensionBreakdown")}</h3>
               {score ? (
                 <div className="space-y-3">
                   {Object.entries(score.dimensions).map(([key, val]) =>
@@ -431,7 +433,7 @@ export default function DashboardHomePage() {
                   )}
                 </div>
               ) : (
-                <p className="py-8 text-center text-sm text-slate-400">No data</p>
+                <p className="py-8 text-center text-sm text-slate-400">{t("common.noData")}</p>
               )}
             </div>
           </div>
@@ -440,7 +442,7 @@ export default function DashboardHomePage() {
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
             {/* Engagement Bar Chart */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-bold text-slate-900">Engagement Distribution</h3>
+              <h3 className="mb-4 text-sm font-bold text-slate-900">{t("dashboard.engagementDistribution")}</h3>
               {score ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={engagementBars}>
@@ -460,22 +462,22 @@ export default function DashboardHomePage() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-40 items-center justify-center text-sm text-slate-400">No data</div>
+                <div className="flex h-40 items-center justify-center text-sm text-slate-400">{t("common.noData")}</div>
               )}
             </div>
 
             {/* Raw Metrics */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-bold text-slate-900">Key Metrics</h3>
+              <h3 className="mb-4 text-sm font-bold text-slate-900">{t("dashboard.keyMetrics")}</h3>
               {score ? (
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: "Followers", value: score.raw_metrics.follower_count, suffix: "" },
-                    { label: "Videos", value: score.raw_metrics.video_count, suffix: "" },
-                    { label: "Total Likes", value: score.raw_metrics.total_likes, suffix: "" },
-                    { label: "Total Shares", value: score.raw_metrics.total_shares, suffix: "" },
-                    { label: "Avg Engagement", value: score.raw_metrics.avg_engagement, suffix: "" },
-                    { label: "Share Ratio", value: score.raw_metrics.share_to_like_ratio, suffix: "" },
+                    { label: t("dashboard.followers"), value: score.raw_metrics.follower_count, suffix: "" },
+                    { label: t("dashboard.videosCount"), value: score.raw_metrics.video_count, suffix: "" },
+                    { label: t("dashboard.totalLikes"), value: score.raw_metrics.total_likes, suffix: "" },
+                    { label: t("dashboard.totalShares"), value: score.raw_metrics.total_shares, suffix: "" },
+                    { label: t("dashboard.avgEngagement"), value: score.raw_metrics.avg_engagement, suffix: "" },
+                    { label: t("dashboard.shareRatio"), value: score.raw_metrics.share_to_like_ratio, suffix: "" },
                   ].map((m) => (
                     <div key={m.label} className="rounded-lg bg-slate-50 p-3">
                       <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{m.label}</p>
@@ -486,7 +488,7 @@ export default function DashboardHomePage() {
                   ))}
                 </div>
               ) : (
-                <p className="py-8 text-center text-sm text-slate-400">No data</p>
+                <p className="py-8 text-center text-sm text-slate-400">{t("common.noData")}</p>
               )}
             </div>
           </div>
@@ -494,7 +496,7 @@ export default function DashboardHomePage() {
           {/* Row 4: Threat Detection */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">Competitive Threat Detection</h3>
+              <h3 className="text-sm font-bold text-slate-900">{t("dashboard.threatDetection")}</h3>
               {threats && (
                 <span
                   className="rounded-full px-3 py-1 text-xs font-bold text-white uppercase"
@@ -505,45 +507,45 @@ export default function DashboardHomePage() {
               )}
             </div>
             {loadingThreats ? (
-              <div className="flex h-24 items-center justify-center text-sm text-slate-400">Analyzing threats...</div>
+              <div className="flex h-24 items-center justify-center text-sm text-slate-400">{t("dashboard.analyzingThreats")}</div>
             ) : threats ? (
               threats.threats.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {threats.threats.map((t, i) => (
+                  {threats.threats.map((th, i) => (
                     <div
                       key={i}
                       className="rounded-xl border-l-4 bg-slate-50 p-4"
-                      style={{ borderLeftColor: severityColors[t.severity] || "#64748b" }}
+                      style={{ borderLeftColor: severityColors[th.severity] || "#64748b" }}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-sm font-semibold text-slate-900">{t.title}</h4>
+                        <h4 className="text-sm font-semibold text-slate-900">{th.title}</h4>
                         <span
                           className="shrink-0 rounded px-2 py-0.5 text-[10px] font-bold uppercase text-white"
-                          style={{ backgroundColor: severityColors[t.severity] || "#64748b" }}
+                          style={{ backgroundColor: severityColors[th.severity] || "#64748b" }}
                         >
-                          {t.severity}
+                          {th.severity}
                         </span>
                       </div>
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{t.description}</p>
+                      <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{th.description}</p>
                       <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-400">
-                        <span>Impact: {t.impact}</span>
-                        <span>Confidence: {(t.confidence_score * 100).toFixed(0)}%</span>
+                        <span>{t("dashboard.impact")}: {th.impact}</span>
+                        <span>{t("dashboard.confidence")}: {(th.confidence_score * 100).toFixed(0)}%</span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="py-6 text-center text-sm text-slate-400">No threats detected</p>
+                <p className="py-6 text-center text-sm text-slate-400">{t("dashboard.noThreats")}</p>
               )
             ) : (
-              <p className="py-6 text-center text-sm text-slate-400">No threat data</p>
+              <p className="py-6 text-center text-sm text-slate-400">{t("dashboard.noThreatData")}</p>
             )}
           </div>
 
           {/* Row 5: Counter Strategy */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">Attack Strategy Recommendation</h3>
+              <h3 className="text-sm font-bold text-slate-900">{t("dashboard.attackStrategy")}</h3>
               {counter?.ai_provider && counter.ai_provider !== "none" && (
                 <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">
                   {counter.ai_provider}
@@ -553,7 +555,7 @@ export default function DashboardHomePage() {
             {loadingCounter ? (
               <div className="flex h-24 items-center justify-center text-sm text-slate-400">
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-indigo-600" />
-                Generating counter-strategies...
+                {t("dashboard.generatingCounter")}
               </div>
             ) : counter && counter.counter_strategies?.length > 0 ? (
               <>
@@ -579,13 +581,13 @@ export default function DashboardHomePage() {
                           <p className="mt-2 text-xs leading-relaxed text-slate-600">{s.action_plan}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
                             <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500">
-                              Target: {s.target_weakness}
+                              {t("dashboard.target")}: {s.target_weakness}
                             </span>
                             <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500">
-                              Timeline: {s.timeline}
+                              {t("dashboard.timeline")}: {s.timeline}
                             </span>
                             <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500">
-                              Impact: {s.expected_impact}
+                              {t("dashboard.impactLabel")}: {s.expected_impact}
                             </span>
                           </div>
                         </div>
@@ -605,7 +607,7 @@ export default function DashboardHomePage() {
               </>
             ) : (
               <p className="py-6 text-center text-sm text-slate-400">
-                {counter ? "No counter-strategies available" : "Failed to generate counter-strategies"}
+                {counter ? t("dashboard.noCounterStrategies") : t("dashboard.counterFailed")}
               </p>
             )}
           </div>

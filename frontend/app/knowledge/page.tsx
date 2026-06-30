@@ -2,6 +2,7 @@
 
 // knowledge/page.tsx — RAG 知识库搜索
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 // ---- 类型 ----
 interface KnowledgeResult {
@@ -32,6 +33,7 @@ function typeClass(t?: string) {
 }
 
 export default function KnowledgePage() {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(10);
   const [results, setResults] = useState<KnowledgeResult[] | null>(null);
@@ -52,7 +54,7 @@ export default function KnowledgePage() {
       });
       if (!res.ok) {
         const msg = await res.json().catch(() => ({}));
-        throw new Error(msg.detail || `请求失败 (${res.status})`);
+        throw new Error(msg.detail || t("common.requestFailed"));
       }
       const data = (await res.json()) as KnowledgeResult[] | { results?: KnowledgeResult[] };
       const arr = Array.isArray(data)
@@ -62,7 +64,7 @@ export default function KnowledgePage() {
         : [];
       setResults(arr);
     } catch (e2) {
-      setError(e2 instanceof Error ? e2.message : "未知错误");
+      setError(e2 instanceof Error ? e2.message : t("common.unknownError"));
     } finally {
       setLoading(false);
     }
@@ -71,9 +73,9 @@ export default function KnowledgePage() {
   return (
     <div>
       <header className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">知识库搜索</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("knowledge.title")}</h1>
         <p className="mt-1 text-sm text-slate-500">
-          基于 RAG 的语义检索 · 搜索已沉淀的情报、分析、策略与趋势
+          {t("knowledge.subtitle")}
         </p>
       </header>
 
@@ -87,7 +89,7 @@ export default function KnowledgePage() {
           required
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="输入关键词, 如: 美妆账号增长策略"
+          placeholder={t("knowledge.searchPlaceholder")}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
         />
         <select
@@ -95,16 +97,16 @@ export default function KnowledgePage() {
           onChange={(e) => setLimit(Number(e.target.value))}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
         >
-          <option value={5}>5 条</option>
-          <option value={10}>10 条</option>
-          <option value={20}>20 条</option>
+          <option value={5}>5</option>
+          <option value={10}>10</option>
+          <option value={20}>20</option>
         </select>
         <button
           type="submit"
           disabled={loading}
           className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
         >
-          {loading ? "搜索中..." : "搜索"}
+          {loading ? t("knowledge.searching") : t("knowledge.searchBtn")}
         </button>
       </form>
 
@@ -115,13 +117,13 @@ export default function KnowledgePage() {
       {/* 搜索结果 */}
       {results !== null && (
         <div className="mb-4 text-sm text-slate-500">
-          找到 <span className="font-semibold text-slate-900">{results.length}</span> 条结果
+          {t("knowledge.resultsCount", { count: results.length })}
         </div>
       )}
 
       {results && results.length === 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-          <p className="text-sm text-slate-400">未找到匹配的知识条目</p>
+          <p className="text-sm text-slate-400">{t("knowledge.noResults")}</p>
         </div>
       )}
 
@@ -172,7 +174,7 @@ export default function KnowledgePage() {
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
           </svg>
-          <p className="text-sm text-slate-400">输入关键词开始搜索知识库</p>
+          <p className="text-sm text-slate-400">{t("knowledge.searchPlaceholder")}</p>
         </div>
       )}
     </div>

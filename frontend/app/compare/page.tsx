@@ -3,6 +3,7 @@
 // compare/page.tsx — 多竞争对手对比: 选择已有分析 → 对比矩阵 / 竞争格局 / SWOT / 建议
 import { useEffect, useState } from "react";
 import { ConfidenceBadge, Items, SectionCard } from "@/components/result-display";
+import { useI18n } from "@/lib/i18n";
 
 // ---- 类型 ----
 interface AnalysisItem {
@@ -38,13 +39,14 @@ interface CompareResult {
 }
 
 const SWOT_CELLS = [
-  { key: "strengths", label: "优势 (Strengths)", color: "border-emerald-200 bg-emerald-50" },
-  { key: "weaknesses", label: "劣势 (Weaknesses)", color: "border-rose-200 bg-rose-50" },
-  { key: "opportunities", label: "机会 (Opportunities)", color: "border-indigo-200 bg-indigo-50" },
-  { key: "threats", label: "威胁 (Threats)", color: "border-amber-200 bg-amber-50" },
+  { key: "strengths", label: "compare.strengths", color: "border-emerald-200 bg-emerald-50" },
+  { key: "weaknesses", label: "compare.weaknesses", color: "border-rose-200 bg-rose-50" },
+  { key: "opportunities", label: "compare.opportunities", color: "border-indigo-200 bg-indigo-50" },
+  { key: "threats", label: "compare.threats", color: "border-amber-200 bg-amber-50" },
 ] as const;
 
 export default function ComparePage() {
+  const { t } = useI18n();
   const [list, setList] = useState<AnalysisItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -56,11 +58,11 @@ export default function ComparePage() {
     (async () => {
       try {
         const res = await fetch("/api/intelligence/analyses");
-        if (!res.ok) throw new Error(`请求失败 (${res.status})`);
+        if (!res.ok) throw new Error(`${t("common.requestFailed")} (${res.status})`);
         const data = (await res.json()) as AnalysisItem[];
         setList(Array.isArray(data) ? data : []);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "加载失败");
+        setError(e instanceof Error ? e.message : t("common.unknownError"));
       } finally {
         setLoading(false);
       }
@@ -89,11 +91,11 @@ export default function ComparePage() {
       });
       if (!res.ok) {
         const msg = await res.json().catch(() => ({}));
-        throw new Error(msg.detail || `请求失败 (${res.status})`);
+        throw new Error(msg.detail || `${t("common.requestFailed")} (${res.status})`);
       }
       setResult((await res.json()) as CompareResult);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "未知错误");
+      setError(e instanceof Error ? e.message : t("common.unknownError"));
     } finally {
       setComparing(false);
     }
@@ -105,9 +107,9 @@ export default function ComparePage() {
   return (
     <div>
       <header className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">竞争对手对比</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("compare.title")}</h1>
         <p className="mt-1 text-sm text-slate-500">
-          选择 2-5 个已有分析, 生成对比矩阵、竞争格局、SWOT 与战略建议
+          {t("compare.subtitle")}
         </p>
       </header>
 
@@ -122,25 +124,21 @@ export default function ComparePage() {
             已有分析 ({list.length})
           </h2>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-500">已选 {selected.size}/5</span>
+            <span className="text-xs text-slate-500">{t("compare.selected")} {selected.size}/5</span>
             <button
               onClick={handleCompare}
               disabled={selected.size < 2 || comparing}
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
             >
-              {comparing ? "对比中..." : "开始对比"}
+              {comparing ? t("compare.comparing") : t("compare.compareBtn")}
             </button>
           </div>
         </div>
 
         {loading ? (
-          <p className="py-8 text-center text-sm text-slate-400">加载中...</p>
+          <p className="py-8 text-center text-sm text-slate-400">{t("common.loading")}</p>
         ) : list.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">
-            暂无分析记录, 请先到{" "}
-            <a href="/intelligence" className="text-indigo-600 hover:underline">智能分析</a>{" "}
-            生成。
-          </p>
+          <p className="py-8 text-center text-sm text-slate-400">{t("compare.noData")}</p>
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {list.map((a) => {
@@ -166,7 +164,7 @@ export default function ComparePage() {
                     </p>
                     <p className="mt-0.5 truncate text-xs text-slate-500">{a.url || "—"}</p>
                     <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-                      {a.video_count != null && <span>{a.video_count} 视频</span>}
+                      {a.video_count != null && <span>{a.video_count} {t("common.videos")}</span>}
                       {a.ai_provider && <span>· {a.ai_provider}</span>}
                     </div>
                   </div>
@@ -182,7 +180,7 @@ export default function ComparePage() {
         <div className="space-y-6">
           {/* 对比矩阵 */}
           {matrix?.rows?.length ? (
-            <SectionCard title="对比矩阵 (Comparison Matrix)">
+            <SectionCard title={t("compare.comparisonMatrix")}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -216,7 +214,7 @@ export default function ComparePage() {
 
           {/* 竞争格局 */}
           {result.competitive_landscape?.length ? (
-            <SectionCard title="竞争格局 (Competitive Landscape)">
+            <SectionCard title={t("compare.competitiveLandscape")}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {result.competitive_landscape.map((c, i) => {
                   const o = c as Record<string, unknown>;
@@ -251,13 +249,13 @@ export default function ComparePage() {
 
           {/* SWOT 分析 */}
           {swot ? (
-            <SectionCard title="SWOT 分析">
+            <SectionCard title={t("compare.swotAnalysis")}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {SWOT_CELLS.map((cell) => {
                   const items = (swot as Record<string, string[] | undefined>)[cell.key];
                   return (
                     <div key={cell.key} className={`rounded-xl border p-4 ${cell.color}`}>
-                      <h3 className="mb-2 text-sm font-semibold text-slate-800">{cell.label}</h3>
+                      <h3 className="mb-2 text-sm font-semibold text-slate-800">{t(cell.label)}</h3>
                       {items && items.length ? (
                         <ul className="space-y-1.5">
                           {items.map((s, i) => (
@@ -268,7 +266,7 @@ export default function ComparePage() {
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-slate-400">暂无数据</p>
+                        <p className="text-sm text-slate-400">{t("common.noData")}</p>
                       )}
                     </div>
                   );
@@ -278,7 +276,7 @@ export default function ComparePage() {
           ) : null}
 
           {/* 战略建议 */}
-          <SectionCard title="战略建议 (Strategic Recommendations)">
+          <SectionCard title={t("compare.strategicRecommendations")}>
             <Items items={result.strategic_recommendations} />
           </SectionCard>
         </div>

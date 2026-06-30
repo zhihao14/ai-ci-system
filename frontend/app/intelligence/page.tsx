@@ -3,6 +3,7 @@
 // intelligence/page.tsx — 核心智能分析: Crawl → Analyze → Strategy 三步流程
 import { useState } from "react";
 import { Items, ObjectView, SectionCard } from "@/components/result-display";
+import { useI18n } from "@/lib/i18n";
 
 // ---- 类型 ----
 interface VideoItem {
@@ -69,6 +70,7 @@ const ANALYZE_SUB_STEPS = [
 ] as const;
 
 export default function IntelligencePage() {
+  const { t } = useI18n();
   const [url, setUrl] = useState("");
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState<1 | 2 | 3 | null>(null);
@@ -87,7 +89,7 @@ export default function IntelligencePage() {
     });
     if (!res.ok) {
       const msg = await res.json().catch(() => ({}));
-      throw new Error(msg.detail || `请求失败 (${res.status})`);
+      throw new Error(msg.detail || `${t("common.requestFailed")} (${res.status})`);
     }
     return res.json();
   };
@@ -104,7 +106,7 @@ export default function IntelligencePage() {
       onOk(await api(path, body));
       setStep(n);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "未知错误");
+      setError(err instanceof Error ? err.message : t("common.unknownError"));
     } finally {
       setLoading(null);
     }
@@ -154,7 +156,7 @@ export default function IntelligencePage() {
       setStep(2);
       setAnalyzeStep("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "未知错误");
+      setError(err instanceof Error ? err.message : t("common.unknownError"));
       setAnalyzeStep("");
     } finally {
       setLoading(null);
@@ -208,9 +210,9 @@ export default function IntelligencePage() {
   return (
     <div>
       <header className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">智能分析</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("intelligence.title")}</h1>
         <p className="mt-1 text-sm text-slate-500">
-          爬取抖音账号视频 → AI 模式分析 → 生成竞争策略 · 每条结论附置信度与证据字段
+          {t("intelligence.subtitle")}
         </p>
       </header>
 
@@ -254,7 +256,7 @@ export default function IntelligencePage() {
           required
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="粘贴抖音账号分享链接"
+          placeholder={t("intelligence.urlPlaceholder")}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
         />
         <button
@@ -262,7 +264,7 @@ export default function IntelligencePage() {
           disabled={loading === 1}
           className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
         >
-          {loading === 1 ? "爬取中..." : "开始爬取"}
+          {loading === 1 ? t("intelligence.crawling") : t("intelligence.crawlBtn")}
         </button>
       </form>
 
@@ -274,20 +276,20 @@ export default function IntelligencePage() {
       {crawl && (
         <div className="mb-6 space-y-6">
           <SectionCard
-            title="爬取结果"
+            title="Crawl Results"
             right={
               <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
-                {crawl.video_count ?? 0} 条视频
+                {crawl.video_count ?? 0} {t("common.videos")}
               </span>
             }
           >
             <p className="mb-4 text-sm text-slate-600">
-              账号: <span className="font-medium text-slate-900">{crawl.account_name || "—"}</span>
+              {t("intelligence.account")}: <span className="font-medium text-slate-900">{crawl.account_name || "—"}</span>
               {crawl.url && (
                 <>
                   {" · "}
                   <a href={crawl.url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
-                    原链接
+                    {t("intelligence.originalLink")}
                   </a>
                 </>
               )}
@@ -324,13 +326,17 @@ export default function IntelligencePage() {
                 </table>
               </div>
             ) : (
-              <p className="text-sm text-slate-400">未获取到视频列表</p>
+              <p className="text-sm text-slate-400">{t("common.noData")}</p>
             )}
             {primaryBtn(
-              "Step 2: AI 模式分析",
+              t("intelligence.analyzeBtn"),
               loading === 2 && analyzeStep
-                ? `分析中: ${ANALYZE_SUB_STEPS.find((s) => s.key === analyzeStep)?.label || "..."}`
-                : "分析中...",
+                ? analyzeStep === "pattern"
+                  ? t("intelligence.analyzingPattern")
+                  : analyzeStep === "growth"
+                  ? t("intelligence.analyzingGrowth")
+                  : t("intelligence.analyzingTrend")
+                : "...",
               2,
               handleAnalyze
             )}
@@ -354,7 +360,11 @@ export default function IntelligencePage() {
                         {ssDone ? "✓" : si + 1}
                       </div>
                       <span className={`text-xs ${ssActive ? "font-semibold text-indigo-700" : "text-slate-400"}`}>
-                        {ss.label}
+                        {ss.key === "pattern"
+                          ? t("intelligence.stepPattern")
+                          : ss.key === "growth"
+                          ? t("intelligence.stepGrowth")
+                          : t("intelligence.stepTrend")}
                       </span>
                       {si < ANALYZE_SUB_STEPS.length - 1 && <span className="text-slate-300">→</span>}
                     </div>
@@ -369,62 +379,62 @@ export default function IntelligencePage() {
       {/* Step 2 结果: patterns + analysis + trends */}
       {analyze && (
         <div className="mb-6 space-y-6">
-          <SectionCard title="内容模式 (Patterns)" right={providerBadge(analyze.ai_provider)}>
+          <SectionCard title={t("intelligence.patterns")} right={providerBadge(analyze.ai_provider)}>
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">主题聚类</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.topicClusters")}</h3>
                 <Items items={analyze.patterns?.topic_clusters} />
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">内容格式分析</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.contentFormat")}</h3>
                 <Items items={analyze.patterns?.content_format_analysis} />
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">发布节奏</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.postingCadence")}</h3>
                 <ObjectView obj={analyze.patterns?.posting_cadence} />
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">互动模式</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.engagementPatterns")}</h3>
                 <ObjectView obj={analyze.patterns?.engagement_patterns} />
               </div>
             </div>
           </SectionCard>
 
-          <SectionCard title="Evidence-based 分析">
+          <SectionCard title={t("intelligence.analysis")}>
             <div className="space-y-5">
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">高频关键词</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.highFrequencyKeywords")}</h3>
                 <Items items={analyze.analysis?.aggregate_analysis?.high_frequency_keywords} />
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">互动量排序</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.engagementRanking")}</h3>
                 <Items items={analyze.analysis?.aggregate_analysis?.engagement_ranking} />
               </div>
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">点赞评论比</h3>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.likeCommentRatio")}</h3>
                   <ObjectView obj={analyze.analysis?.aggregate_analysis?.like_comment_ratio} />
                 </div>
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">发布时间规律</h3>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.postingTimePattern")}</h3>
                   <ObjectView obj={analyze.analysis?.aggregate_analysis?.posting_time_pattern} />
                 </div>
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">高表现内容类型</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.topContentTypes")}</h3>
                 <Items items={analyze.analysis?.aggregate_analysis?.top_content_types} />
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">数据驱动结论</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.dataDrivenConclusions")}</h3>
                 <Items items={analyze.analysis?.actionable_insights} />
               </div>
             </div>
           </SectionCard>
 
-          <SectionCard title="趋势预测 (Trends)">
+          <SectionCard title={t("intelligence.trends")}>
             <div className="space-y-5">
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">内容趋势</h3>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.contentTrends")}</h3>
                 {trends && (trends.rising || trends.falling || trends.stable) ? (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     {trendGroup("上升 ↑", trends.rising, "text-emerald-600")}
@@ -432,43 +442,43 @@ export default function IntelligencePage() {
                     {trendGroup("稳定 →", trends.stable, "text-slate-500")}
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-400">暂无数据</p>
+                  <p className="text-sm text-slate-400">{t("common.noData")}</p>
                 )}
               </div>
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">互动量预测</h3>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.engagementForecast")}</h3>
                   <ObjectView obj={analyze.trends?.engagement_forecast} />
                 </div>
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">增长轨迹</h3>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.growthTrajectory")}</h3>
                   <ObjectView obj={analyze.trends?.growth_trajectory} />
                 </div>
               </div>
             </div>
-            {primaryBtn("Step 3: 生成竞争策略", "生成中...", 3, handleStrategy)}
+            {primaryBtn(t("intelligence.strategyBtn"), t("intelligence.generatingStrategy"), 3, handleStrategy)}
           </SectionCard>
         </div>
       )}
 
       {/* Step 3 结果: strategy */}
       {strategy && (
-        <SectionCard title="竞争策略 (Strategy)" right={providerBadge(strategy.ai_provider)}>
+        <SectionCard title={t("intelligence.strategy")} right={providerBadge(strategy.ai_provider)}>
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-slate-700">短期行动</h3>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.shortTermActions")}</h3>
               <Items items={strategy.strategy?.short_term_actions} />
             </div>
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-slate-700">中期策略</h3>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.midTermStrategy")}</h3>
               <Items items={strategy.strategy?.mid_term_strategy} />
             </div>
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-slate-700">内容日历</h3>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.contentCalendar")}</h3>
               <Items items={strategy.strategy?.content_calendar} />
             </div>
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-slate-700">KPI 目标</h3>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">{t("intelligence.kpiTargets")}</h3>
               <Items items={strategy.strategy?.kpi_targets} />
             </div>
           </div>
