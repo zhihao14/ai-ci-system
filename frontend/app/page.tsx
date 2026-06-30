@@ -1,191 +1,616 @@
 "use client";
 
-// page.tsx — Dashboard 首页: 统计卡片 + 最近分析 + 知识库类型分布
-import { useEffect, useState } from "react";
-import Link from "next/link";
+// page.tsx — Realtime Intelligence Dashboard
+// Premium Enterprise SaaS UI with:
+// - Competitor Score Engine (radar chart + gauge)
+// - Executive Summary Engine
+// - Competitive Threat Detection
+// - Auto Counter Strategy Engine
+// - Visual Analytics (less text, more signal)
 
-// ---- 类型 ----
-interface RecentAnalysis {
-  id?: string;
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import {
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  AreaChart, Area, Cell,
+} from "recharts";
+
+// ---- Types ----
+interface ScoreData {
+  analysis_id: string;
+  account_name: string;
+  overall_score: number;
+  grade: string;
+  dimensions: {
+    reach: number;
+    engagement: number;
+    consistency: number;
+    virality: number;
+    content_depth: number;
+  };
+  raw_metrics: {
+    follower_count: number;
+    video_count: number;
+    total_likes: number;
+    total_comments: number;
+    total_shares: number;
+    avg_engagement: number;
+    share_to_like_ratio: number;
+    content_type_count: number;
+    keyword_count: number;
+  };
+  benchmarks: {
+    engagement_vs_avg: number;
+    virality_vs_avg: number;
+  };
+}
+
+interface ExecSummary {
+  analysis_id: string;
+  account_name: string;
+  headline?: string;
+  summary?: string;
+  key_metrics?: string[];
+  recommendation?: string;
+  score: number;
+  grade: string;
+  dimensions?: ScoreData["dimensions"];
+  ai_provider?: string;
+}
+
+interface Threat {
+  type: string;
+  severity: "high" | "medium" | "low";
+  title: string;
+  description: string;
+  evidence: string;
+  confidence_score: number;
+  impact: string;
+}
+
+interface ThreatData {
+  analysis_id: string;
+  account_name: string;
+  threat_level: "critical" | "high" | "moderate" | "low" | "minimal";
+  threat_count: number;
+  threats: Threat[];
+  score: number;
+  grade: string;
+}
+
+interface CounterStrategy {
+  tactic: string;
+  target_weakness: string;
+  action_plan: string;
+  timeline: string;
+  expected_impact: string;
+  priority: "high" | "medium" | "low";
+  confidence_score: number;
+}
+
+interface CounterData {
+  analysis_id: string;
+  account_name: string;
+  counter_strategies: CounterStrategy[];
+  overall_approach?: string;
+  competitor_score: number;
+  threat_level: string;
+  ai_provider: string;
+}
+
+interface AnalysisItem {
+  id: string;
   account_name?: string;
   url?: string;
   video_count?: number;
   ai_provider?: string;
   created_at?: string;
-  [k: string]: unknown;
 }
 
-interface KnowledgeType {
-  content_type?: string;
-  type?: string;
-  count?: number;
-  [k: string]: unknown;
-}
-
-interface DashboardData {
-  total_analyses?: number;
-  competitor_count?: number;
-  knowledge_count?: number;
-  comparison_count?: number;
-  recent_analyses?: RecentAnalysis[];
-  knowledge_type_distribution?: KnowledgeType[];
-  [k: string]: unknown;
-}
+// ---- Grade color mapping ----
+const gradeColors: Record<string, string> = {
+  S: "#10b981", A: "#3b82f6", B: "#8b5cf6", C: "#f59e0b", D: "#ef4444",
+};
+const severityColors: Record<string, string> = {
+  high: "#ef4444", medium: "#f59e0b", low: "#3b82f6",
+};
+const threatLevelColors: Record<string, string> = {
+  critical: "#dc2626", high: "#ef4444", moderate: "#f59e0b", low: "#3b82f6", minimal: "#10b981",
+};
 
 export default function DashboardHomePage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [analyses, setAnalyses] = useState<AnalysisItem[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loadingList, setLoadingList] = useState(true);
+
+  // Intelligence data
+  const [score, setScore] = useState<ScoreData | null>(null);
+  const [execSummary, setExecSummary] = useState<ExecSummary | null>(null);
+  const [threats, setThreats] = useState<ThreatData | null>(null);
+  const [counter, setCounter] = useState<CounterData | null>(null);
+
+  // Loading states
+  const [loadingScore, setLoadingScore] = useState(false);
+  const [loadingExec, setLoadingExec] = useState(false);
+  const [loadingThreats, setLoadingThreats] = useState(false);
+  const [loadingCounter, setLoadingCounter] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Load analysis list
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/intelligence/dashboard");
-        if (!res.ok) throw new Error(`请求失败 (${res.status})`);
-        const d = (await res.json()) as DashboardData;
-        setData(d);
+        const res = await fetch("/api/intelligence/analyses");
+        if (!res.ok) throw new Error(`Failed (${res.status})`);
+        const data = (await res.json()) as AnalysisItem[];
+        setAnalyses(data);
+        if (data.length > 0) setSelectedId(data[0].id);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "加载失败");
+        setError(e instanceof Error ? e.message : "Load failed");
       } finally {
-        setLoading(false);
+        setLoadingList(false);
       }
     })();
   }, []);
 
-  const stats = [
-    { label: "总分析数", value: data?.total_analyses ?? 0, icon: "M9 17v-2m3 2v-4m3 4v-6M4 19h16" },
-    { label: "竞争对手数", value: data?.competitor_count ?? 0, icon: "M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m6-1.13a4 4 0 1 0-4-4 4 4 0 0 0 4 4z" },
-    { label: "知识库条目数", value: data?.knowledge_count ?? 0, icon: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z" },
-    { label: "对比数", value: data?.comparison_count ?? 0, icon: "M8 7h8m-8 5h8m-8 5h8M4 4v16h16" },
-  ];
+  // Fetch all intelligence data when analysis is selected
+  const fetchIntelligence = useCallback(async (id: string) => {
+    setError(null);
+    setScore(null);
+    setExecSummary(null);
+    setThreats(null);
+    setCounter(null);
+
+    // 1. Score (instant, pure Python)
+    setLoadingScore(true);
+    try {
+      const res = await fetch(`/api/intelligence/score/${id}`);
+      if (res.ok) setScore(await res.json());
+    } catch (e) { /* ignore */ }
+    setLoadingScore(false);
+
+    // 2. Threats (instant, pure Python)
+    setLoadingThreats(true);
+    try {
+      const res = await fetch(`/api/intelligence/threats/${id}`);
+      if (res.ok) setThreats(await res.json());
+    } catch (e) { /* ignore */ }
+    setLoadingThreats(false);
+
+    // 3. Executive Summary (AI, ~10s) — run in background
+    setLoadingExec(true);
+    try {
+      const res = await fetch(`/api/intelligence/executive-summary/${id}`);
+      if (res.ok) setExecSummary(await res.json());
+    } catch (e) { /* ignore */ }
+    setLoadingExec(false);
+
+    // 4. Counter Strategy (AI, ~10s) — run after exec summary
+    setLoadingCounter(true);
+    try {
+      const res = await fetch(`/api/intelligence/counter-strategy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ video_analysis_id: id }),
+      });
+      if (res.ok) setCounter(await res.json());
+    } catch (e) { /* ignore */ }
+    setLoadingCounter(false);
+  }, []);
+
+  useEffect(() => {
+    if (selectedId) fetchIntelligence(selectedId);
+  }, [selectedId, fetchIntelligence]);
+
+  // ---- Radar chart data ----
+  const radarData = score
+    ? [
+        { dimension: "Reach", value: score.dimensions.reach, fullMark: 100 },
+        { dimension: "Engagement", value: score.dimensions.engagement, fullMark: 100 },
+        { dimension: "Consistency", value: score.dimensions.consistency, fullMark: 100 },
+        { dimension: "Virality", value: score.dimensions.virality, fullMark: 100 },
+        { dimension: "Content Depth", value: score.dimensions.content_depth, fullMark: 100 },
+      ]
+    : [];
+
+  // ---- Engagement bar chart data ----
+  const engagementBars = score?.raw_metrics
+    ? [
+        { name: "Likes", value: score.raw_metrics.total_likes, fill: "#3b82f6" },
+        { name: "Comments", value: score.raw_metrics.total_comments, fill: "#8b5cf6" },
+        { name: "Shares", value: score.raw_metrics.total_shares, fill: "#10b981" },
+      ]
+    : [];
+
+  // ---- Score gauge ----
+  const scoreGauge = (value: number, label: string, grade: string) => {
+    const circumference = 2 * Math.PI * 52;
+    const offset = circumference - (value / 100) * circumference;
+    return (
+      <div className="relative flex h-32 w-32 items-center justify-center">
+        <svg className="h-32 w-32 -rotate-90" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="#e2e8f0" strokeWidth="8" />
+          <circle
+            cx="60" cy="60" r="52" fill="none" stroke={gradeColors[grade] || "#3b82f6"}
+            strokeWidth="8" strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className="transition-all duration-700 ease-out"
+          />
+        </svg>
+        <div className="absolute flex flex-col items-center">
+          <span className="text-2xl font-bold text-slate-900">{value}</span>
+          <span className="text-xs font-medium text-slate-400">/ 100</span>
+          <span
+            className="mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold text-white"
+            style={{ backgroundColor: gradeColors[grade] || "#3b82f6" }}
+          >
+            {grade}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  // ---- Dimension bar ----
+  const dimBar = (label: string, value: number) => (
+    <div key={label} className="flex items-center gap-3">
+      <span className="w-24 shrink-0 text-xs font-medium text-slate-500">{label}</span>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{
+            width: `${value}%`,
+            backgroundColor: value >= 70 ? "#10b981" : value >= 50 ? "#f59e0b" : "#ef4444",
+          }}
+        />
+      </div>
+      <span className="w-8 shrink-0 text-right text-xs font-semibold text-slate-700">{value}</span>
+    </div>
+  );
 
   return (
-    <div>
-      {/* 页头 */}
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">仪表盘</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          竞争情报系统总览 · 分析、对比与知识库统计
-        </p>
+    <div className="min-h-screen">
+      {/* Header */}
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Intelligence Dashboard</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Real-time competitive intelligence · Score · Threats · Counter-strategies
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedId ?? ""}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500"
+          >
+            {analyses.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.account_name || "Unknown"} · {a.video_count ?? 0} videos
+              </option>
+            ))}
+          </select>
+          <Link
+            href="/intelligence"
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            + New Analysis
+          </Link>
+        </div>
       </header>
 
-      {error && (
-        <div className="mb-6 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
+      {/* Analysis list loading */}
+      {loadingList && (
+        <div className="flex h-64 items-center justify-center">
+          <div className="animate-pulse text-sm text-slate-400">Loading analyses...</div>
         </div>
       )}
 
-      {/* 统计卡片 */}
-      <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-500">{s.label}</span>
-              <svg className="h-5 w-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d={s.icon} />
-              </svg>
-            </div>
-            <p className="mt-3 text-3xl font-bold text-slate-900">
-              {loading ? "—" : (s.value as number).toLocaleString()}
-            </p>
-          </div>
-        ))}
-      </section>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
-        {/* 最近分析 */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">最近分析</h2>
-            <Link
-              href="/intelligence"
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-            >
-              新建分析 →
+      {/* No analyses */}
+      {!loadingList && analyses.length === 0 && (
+        <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white">
+          <div className="text-center">
+            <p className="text-sm text-slate-400">No analyses yet</p>
+            <Link href="/intelligence" className="mt-2 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-700">
+              Start your first analysis →
             </Link>
           </div>
-          {loading ? (
-            <p className="py-8 text-center text-sm text-slate-400">加载中...</p>
-          ) : !data?.recent_analyses?.length ? (
-            <p className="py-8 text-center text-sm text-slate-400">暂无分析记录</p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {data.recent_analyses.slice(0, 5).map((a, i) => (
-                <Link
-                  key={a.id ?? i}
-                  href="/intelligence"
-                  className="flex items-center justify-between gap-3 py-3 transition hover:bg-slate-50"
+        </div>
+      )}
+
+      {/* Dashboard content */}
+      {selectedId && !loadingList && (
+        <div className="space-y-5">
+          {/* Row 1: Executive Summary + Score Gauge */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_280px]">
+            {/* Executive Summary */}
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white shadow-lg">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+                  Executive Summary
+                </span>
+                {execSummary?.ai_provider && execSummary.ai_provider !== "none" && (
+                  <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                    {execSummary.ai_provider}
+                  </span>
+                )}
+              </div>
+              {loadingExec ? (
+                <div className="space-y-2">
+                  <div className="h-5 w-3/4 animate-pulse rounded bg-white/10" />
+                  <div className="h-5 w-full animate-pulse rounded bg-white/10" />
+                  <div className="h-5 w-5/6 animate-pulse rounded bg-white/10" />
+                </div>
+              ) : execSummary ? (
+                <>
+                  {execSummary.headline && (
+                    <h2 className="mb-3 text-lg font-bold leading-tight">{execSummary.headline}</h2>
+                  )}
+                  <p className="text-sm leading-relaxed text-slate-300">
+                    {execSummary.summary}
+                  </p>
+                  {execSummary.key_metrics && execSummary.key_metrics.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {execSummary.key_metrics.map((m, i) => (
+                        <span key={i} className="rounded-lg bg-white/5 px-3 py-1 text-xs text-slate-300">
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {execSummary.recommendation && (
+                    <div className="mt-4 border-l-2 border-indigo-400 pl-3">
+                      <p className="text-xs text-slate-400">Strategic Recommendation</p>
+                      <p className="mt-1 text-sm font-medium text-indigo-200">{execSummary.recommendation}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-slate-400">Failed to generate summary</p>
+              )}
+            </div>
+
+            {/* Score Gauge */}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <span className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+                Competitor Score
+              </span>
+              {loadingScore ? (
+                <div className="flex h-32 w-32 items-center justify-center">
+                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-600" />
+                </div>
+              ) : score ? (
+                <>
+                  {scoreGauge(score.overall_score, "Overall", score.grade)}
+                  <p className="mt-3 text-center text-sm font-medium text-slate-600">
+                    {score.account_name}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-slate-400">No score data</p>
+              )}
+            </div>
+          </div>
+
+          {/* Row 2: Radar Chart + Dimension Bars */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            {/* Radar Chart */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold text-slate-900">Radar Analytics</h3>
+              {score ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <RadarChart data={radarData}>
+                    <PolarGrid stroke="#e2e8f0" />
+                    <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: "#64748b" }} />
+                    <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "#94a3b8" }} />
+                    <Radar
+                      dataKey="value"
+                      stroke="#6366f1"
+                      fill="#6366f1"
+                      fillOpacity={0.3}
+                      strokeWidth={2}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-52 items-center justify-center text-sm text-slate-400">
+                  {loadingScore ? "Calculating scores..." : "No data"}
+                </div>
+              )}
+            </div>
+
+            {/* Dimension Bars */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold text-slate-900">Dimension Breakdown</h3>
+              {score ? (
+                <div className="space-y-3">
+                  {Object.entries(score.dimensions).map(([key, val]) =>
+                    dimBar(key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), val)
+                  )}
+                </div>
+              ) : (
+                <p className="py-8 text-center text-sm text-slate-400">No data</p>
+              )}
+            </div>
+          </div>
+
+          {/* Row 3: Engagement Bar Chart + Raw Metrics */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
+            {/* Engagement Bar Chart */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold text-slate-900">Engagement Distribution</h3>
+              {score ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={engagementBars}>
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: 8, border: "1px solid #e2e8f0",
+                        fontSize: 12, padding: "8px 12px",
+                      }}
+                    />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                      {engagementBars.map((entry, i) => (
+                        <Cell key={i} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-40 items-center justify-center text-sm text-slate-400">No data</div>
+              )}
+            </div>
+
+            {/* Raw Metrics */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold text-slate-900">Key Metrics</h3>
+              {score ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Followers", value: score.raw_metrics.follower_count, suffix: "" },
+                    { label: "Videos", value: score.raw_metrics.video_count, suffix: "" },
+                    { label: "Total Likes", value: score.raw_metrics.total_likes, suffix: "" },
+                    { label: "Total Shares", value: score.raw_metrics.total_shares, suffix: "" },
+                    { label: "Avg Engagement", value: score.raw_metrics.avg_engagement, suffix: "" },
+                    { label: "Share Ratio", value: score.raw_metrics.share_to_like_ratio, suffix: "" },
+                  ].map((m) => (
+                    <div key={m.label} className="rounded-lg bg-slate-50 p-3">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{m.label}</p>
+                      <p className="mt-1 text-lg font-bold text-slate-900">
+                        {typeof m.value === "number" ? m.value.toLocaleString() : "—"}{m.suffix}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-8 text-center text-sm text-slate-400">No data</p>
+              )}
+            </div>
+          </div>
+
+          {/* Row 4: Threat Detection */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Competitive Threat Detection</h3>
+              {threats && (
+                <span
+                  className="rounded-full px-3 py-1 text-xs font-bold text-white uppercase"
+                  style={{ backgroundColor: threatLevelColors[threats.threat_level] || "#64748b" }}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900">
-                      {a.account_name || a.url || "未命名分析"}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">{a.url || "—"}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2 text-xs text-slate-500">
-                    {a.video_count != null && <span>{a.video_count} 条视频</span>}
-                    {a.ai_provider && (
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-600">
-                        {a.ai_provider}
-                      </span>
-                    )}
-                    {a.created_at && (
-                      <span>{new Date(a.created_at).toLocaleDateString("zh-CN")}</span>
-                    )}
-                  </div>
-                </Link>
-              ))}
+                  {threats.threat_level}
+                </span>
+              )}
             </div>
-          )}
-        </section>
-
-        {/* 知识库类型分布 */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">知识库类型分布</h2>
-            <Link
-              href="/knowledge"
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-            >
-              搜索 →
-            </Link>
+            {loadingThreats ? (
+              <div className="flex h-24 items-center justify-center text-sm text-slate-400">Analyzing threats...</div>
+            ) : threats ? (
+              threats.threats.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {threats.threats.map((t, i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border-l-4 bg-slate-50 p-4"
+                      style={{ borderLeftColor: severityColors[t.severity] || "#64748b" }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-sm font-semibold text-slate-900">{t.title}</h4>
+                        <span
+                          className="shrink-0 rounded px-2 py-0.5 text-[10px] font-bold uppercase text-white"
+                          style={{ backgroundColor: severityColors[t.severity] || "#64748b" }}
+                        >
+                          {t.severity}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{t.description}</p>
+                      <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-400">
+                        <span>Impact: {t.impact}</span>
+                        <span>Confidence: {(t.confidence_score * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-6 text-center text-sm text-slate-400">No threats detected</p>
+              )
+            ) : (
+              <p className="py-6 text-center text-sm text-slate-400">No threat data</p>
+            )}
           </div>
-          {loading ? (
-            <p className="py-8 text-center text-sm text-slate-400">加载中...</p>
-          ) : !data?.knowledge_type_distribution?.length ? (
-            <p className="py-8 text-center text-sm text-slate-400">暂无知识库数据</p>
-          ) : (
-            <div className="space-y-3">
-              {data.knowledge_type_distribution.map((t, i) => {
-                const label = t.content_type || t.type || "未知";
-                const count = t.count ?? 0;
-                const total = data.knowledge_type_distribution!.reduce(
-                  (s, x) => s + (x.count ?? 0),
-                  0
-                );
-                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                return (
-                  <div key={i}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="text-slate-600">{label}</span>
-                      <span className="text-slate-400">{count}</span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-indigo-600"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+
+          {/* Row 5: Counter Strategy */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Attack Strategy Recommendation</h3>
+              {counter?.ai_provider && counter.ai_provider !== "none" && (
+                <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">
+                  {counter.ai_provider}
+                </span>
+              )}
             </div>
-          )}
-        </section>
-      </div>
+            {loadingCounter ? (
+              <div className="flex h-24 items-center justify-center text-sm text-slate-400">
+                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-indigo-600" />
+                Generating counter-strategies...
+              </div>
+            ) : counter && counter.counter_strategies?.length > 0 ? (
+              <>
+                {counter.overall_approach && (
+                  <div className="mb-4 rounded-lg bg-indigo-50 px-4 py-2.5 text-sm font-medium text-indigo-700">
+                    {counter.overall_approach}
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {counter.counter_strategies.map((s, i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                              {i + 1}
+                            </span>
+                            <h4 className="text-sm font-semibold text-slate-900">{s.tactic}</h4>
+                          </div>
+                          <p className="mt-2 text-xs leading-relaxed text-slate-600">{s.action_plan}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500">
+                              Target: {s.target_weakness}
+                            </span>
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500">
+                              Timeline: {s.timeline}
+                            </span>
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500">
+                              Impact: {s.expected_impact}
+                            </span>
+                          </div>
+                        </div>
+                        <span
+                          className="shrink-0 rounded px-2 py-1 text-[10px] font-bold uppercase text-white"
+                          style={{
+                            backgroundColor:
+                              s.priority === "high" ? "#ef4444" : s.priority === "medium" ? "#f59e0b" : "#3b82f6",
+                          }}
+                        >
+                          {s.priority}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="py-6 text-center text-sm text-slate-400">
+                {counter ? "No counter-strategies available" : "Failed to generate counter-strategies"}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

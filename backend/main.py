@@ -474,6 +474,61 @@ def intelligence_dashboard():
     return get_intelligence_dashboard()
 
 
+# ============================================================
+# Advanced Intelligence Engines — Score / Summary / Threats / Counter-Strategy
+# ============================================================
+
+@app.get("/api/intelligence/score/{analysis_id}")
+def competitor_score(analysis_id: str):
+    """Competitor Score Engine — multi-dimensional scoring (~1s, pure Python)"""
+    from engines import calculate_competitor_score
+    try:
+        return calculate_competitor_score(analysis_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/intelligence/executive-summary/{analysis_id}")
+def executive_summary(analysis_id: str):
+    """Executive Summary Engine — AI-generated concise briefing (~10s)"""
+    from engines import generate_executive_summary
+    try:
+        return generate_executive_summary(analysis_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/intelligence/threats/{analysis_id}")
+def threat_detection(analysis_id: str):
+    """Competitive Threat Detection — rule-based analysis (~1s)"""
+    from engines import detect_threats
+    try:
+        return detect_threats(analysis_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/intelligence/counter-strategy")
+def counter_strategy(req: dict):
+    """Auto Counter Strategy Engine — AI-generated attack strategies (~10s)"""
+    from engines import generate_counter_strategy
+    analysis_id = req.get("video_analysis_id") or req.get("analysis_id")
+    if not analysis_id:
+        raise HTTPException(status_code=422, detail="video_analysis_id 必填")
+    try:
+        return generate_counter_strategy(analysis_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/intelligence/init-db")
 def init_intelligence_db():
     """临时端点: 执行数据库迁移 (创建智能分析模块的6张表)
