@@ -79,8 +79,23 @@ interface GrowthResult {
   url: string;
   title: string;
   account_info: string;
+  account_fields: Record<string, unknown> | null;
+  videos: VideoData[] | null;
+  video_count: number;
   analysis: Analysis;
   ai_provider: string;
+}
+
+interface VideoData {
+  aweme_id: string;
+  title: string;
+  desc: string;
+  digg_count: number | null;
+  comment_count: number | null;
+  share_count: number | null;
+  play_count: number | null;
+  create_time_str: string | null;
+  video_url: string | null;
 }
 
 // ---- 置信度颜色 ----
@@ -133,6 +148,7 @@ function InsufficientBanner() {
 export default function GrowthPage() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [stepMessage, setStepMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GrowthResult | null>(null);
 
@@ -143,21 +159,52 @@ export default function GrowthPage() {
     setError(null);
     setResult(null);
     try {
-      const res = await fetch("/api/growth-analysis", {
+      // 第1步: 爬取账号信息+视频列表 (Playwright, ~30s)
+      setStepMessage("正在爬取视频数据 (Playwright Network Intercept)...");
+      const crawlRes = await fetch("/api/crawl", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      if (!res.ok) {
-        const msg = await res.json().catch(() => ({}));
-        throw new Error(msg.detail || `请求失败 (${res.status})`);
+      if (!crawlRes.ok) {
+        const msg = await crawlRes.json().catch(() => ({}));
+        throw new Error(msg.detail || `爬取失败 (${crawlRes.status})`);
       }
-      const data: GrowthResult = await res.json();
+      const crawlData = await crawlRes.json();
+
+      // 第2步: AI evidence-based 聚合分析 (~15s)
+      setStepMessage("正在执行 AI evidence-based 聚合分析...");
+      const analyzeRes = await fetch("/api/analyze-growth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_info: crawlData.account_info,
+          videos: crawlData.videos,
+          account_fields: crawlData.account_fields,
+        }),
+      });
+      if (!analyzeRes.ok) {
+        const msg = await analyzeRes.json().catch(() => ({}));
+        throw new Error(msg.detail || `分析失败 (${analyzeRes.status})`);
+      }
+      const analyzeData = await analyzeRes.json();
+
+      const data: GrowthResult = {
+        url: crawlData.url,
+        title: crawlData.title,
+        account_info: crawlData.account_info,
+        account_fields: crawlData.account_fields,
+        videos: crawlData.videos,
+        video_count: crawlData.video_count,
+        analysis: analyzeData.analysis,
+        ai_provider: analyzeData.ai_provider,
+      };
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
       setLoading(false);
+      setStepMessage("");
     }
   };
 
@@ -213,7 +260,10 @@ export default function GrowthPage() {
 
       {loading && (
         <div className="mb-6 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
-          正在执行 evidence-based 聚合分析，包含爬虫抓取 + AI 数据统计，预计需要 10-20 秒...
+          {stepMessage || "分析中..."}
+          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-indigo-200">
+            <div className="h-full w-1/3 animate-pulse rounded-full bg-indigo-500" />
+          </div>
         </div>
       )}
 
@@ -296,6 +346,61 @@ export default function GrowthPage() {
               </pre>
             </details>
           </div>
+
+          {/* ===== 视频列表 ===== */}
+          {result.videos && result.videos.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-900">爬取的视频数据</h3>
+                <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">
+                  {result.video_count} 条视频
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs text-slate-400">
+                      <th className="pb-2 pr-3 text-left font-medium">#</th>
+                      <th className="pb-2 pr-3 text-left font-medium">标题</th>
+                      <th className="pb-2 pr-3 text-right font-medium">点赞</th>
+                      <th className="pb-2 pr-3 text-right font-medium">评论</th>
+                      <th className="pb-2 pr-3 text-right font-medium">转发</th>
+                      <th className="pb-2 text-left font-medium">发布时间</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.videos.slice(0, 10).map((v, i) => (
+                      <tr key={v.aweme_id || i} className="border-b border-slate-100">
+                        <td className="py-2 pr-3 text-slate-400">{i + 1}</td>
+                        <td className="py-2 pr-3 text-slate-600 max-w-xs truncate">
+                          {v.title || v.desc || "—"}
+                        </td>
+                        <td className="py-2 pr-3 text-right text-slate-600">
+                          {v.digg_count?.toLocaleString() ?? "—"}
+                        </td>
+                        <td className="py-2 pr-3 text-right text-slate-600">
+                          {v.comment_count?.toLocaleString() ?? "—"}
+                        </td>
+                        <td className="py-2 pr-3 text-right text-slate-600">
+                          {v.share_count?.toLocaleString() ?? "—"}
+                        </td>
+                        <td className="py-2 text-xs text-slate-500">
+                          {v.create_time_str
+                            ? new Date(v.create_time_str).toLocaleString("zh-CN")
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {result.videos.length > 10 && (
+                <p className="mt-2 text-xs text-slate-400">
+                  仅显示前10条, 完整 {result.videos.length} 条数据已传给 AI 分析
+                </p>
+              )}
+            </section>
+          )}
 
           {/* ===== 聚合分析 ===== */}
           <section className="rounded-2xl border border-slate-200 bg-white p-6">

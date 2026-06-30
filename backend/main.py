@@ -176,16 +176,14 @@ def report_detail(report_id: str):
 
 
 # ============================================================
-# 短视频增长策略分析 (4层框架)
+# 短视频数据分析 (拆分为两步: 爬取 + 分析, 避免Railway 60s超时)
 # ============================================================
 
-@app.post("/api/growth-analysis")
-def growth_analysis(req: GrowthAnalysisRequest):
-    """短视频增长策略分析: 爬取账号信息 -> AI evidence-based 聚合分析"""
+@app.post("/api/crawl")
+def crawl_data(req: GrowthAnalysisRequest):
+    """第1步: 爬取账号信息和视频列表 (Playwright, ~30s)"""
     url = req.url.strip()
-    videos = req.videos
 
-    # 1) 爬取账号信息
     crawled = run_crawler(url)
     if crawled.get("error"):
         raise HTTPException(status_code=502, detail=f"爬取失败: {crawled['error']}")
@@ -195,12 +193,61 @@ def growth_analysis(req: GrowthAnalysisRequest):
     if not content.strip():
         raise HTTPException(status_code=422, detail="页面正文为空, 无法分析")
 
-    # 获取结构化字段 (抖音爬虫返回, 其他来源可能没有)
     account_fields = crawled.get("account_fields")
-    # 获取视频列表 (Playwright Network Intercept 抓取)
     videos = crawled.get("videos") or req.videos
 
-    # 2) AI 增长策略分析
+    return {
+        "url": url,
+        "title": title,
+        "account_info": content,
+        "account_fields": account_fields,
+        "videos": videos,
+        "video_count": len(videos) if videos else 0,
+    }
+
+
+@app.post("/api/analyze-growth")
+def analyze_growth(req: dict):
+    """第2步: AI evidence-based 聚合分析 (~15s)"""
+    account_info = req.get("account_info", "")
+    videos = req.get("videos")
+    account_fields = req.get("account_fields")
+
+    if not account_info.strip() and not videos:
+        raise HTTPException(status_code=422, detail="账号信息和视频数据均为空")
+
+    result = growth_analyze(account_info, videos, account_fields)
+    if result.get("ai_provider") == "none":
+        raise HTTPException(
+            status_code=503,
+            detail=result.get("error", "AI 分析失败, 请检查 AI 配置"),
+        )
+
+    return {
+        "analysis": result,
+        "ai_provider": result.get("ai_provider"),
+    }
+
+
+@app.post("/api/growth-analysis")
+def growth_analysis(req: GrowthAnalysisRequest):
+    """一体化接口 (本地调试用, Railway 60s 超时请用 /api/crawl + /api/analyze-growth)"""
+    url = req.url.strip()
+
+    # 1) 爬取
+    crawled = run_crawler(url)
+    if crawled.get("error"):
+        raise HTTPException(status_code=502, detail=f"爬取失败: {crawled['error']}")
+
+    title = crawled.get("title") or url
+    content = crawled.get("content") or ""
+    if not content.strip():
+        raise HTTPException(status_code=422, detail="页面正文为空, 无法分析")
+
+    account_fields = crawled.get("account_fields")
+    videos = crawled.get("videos") or req.videos
+
+    # 2) AI 分析
     result = growth_analyze(content, videos, account_fields)
     if result.get("ai_provider") == "none":
         raise HTTPException(
@@ -208,7 +255,6 @@ def growth_analysis(req: GrowthAnalysisRequest):
             detail=result.get("error", "AI 分析失败, 请检查 AI 配置"),
         )
 
-    # 3) 返回结构化结果
     return {
         "url": url,
         "title": title,
