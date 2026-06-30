@@ -50,7 +50,20 @@ async function crawlDouyinShare(shareUrl) {
 
   const u = data.user_info;
 
-  // 4. 格式化为结构化文本供 AI 分析
+  // 4. 结构化字段 (供 AI 引用为 evidence_fields)
+  const account_fields = {
+    nickname: u.nickname || null,
+    unique_id: u.unique_id || u.short_id || null,
+    signature: u.signature || null,
+    verify_reason: u.enterprise_verify_reason || u.custom_verify || null,
+    follower_count: u.mplatform_followers_count ?? null,
+    total_favorited: u.total_favorited ? Number(u.total_favorited) : null,
+    aweme_count: u.aweme_count ?? null,
+    following_count: u.following_count ?? null,
+    sec_uid: secUid,
+  };
+
+  // 5. 格式化为结构化文本供 AI 分析
   const content = [
     `账号名称: ${u.nickname}`,
     `抖音号: ${u.unique_id || u.short_id || "未知"}`,
@@ -64,7 +77,7 @@ async function crawlDouyinShare(shareUrl) {
   ].join("\n");
 
   const title = `${u.nickname} - 抖音`;
-  return { url: shareUrl, title, content, error: null };
+  return { url: shareUrl, title, content, account_fields, error: null };
 }
 
 // ============================================================

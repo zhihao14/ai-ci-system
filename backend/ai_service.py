@@ -185,10 +185,11 @@ GROWTH_SYSTEM_PROMPT = (
     "2. 禁止编造传播模型或抽象理论框架\n"
     "3. 禁止虚构未提供的视频标题、数据或内容\n"
     "4. 禁止基于账号简介推测视频内容特征\n"
-    "5. 如果某项分析所需的数据字段不存在或为空, 必须输出 '数据不足，无法判断'\n"
+    "5. 禁止编造不存在的字段名: evidence_fields 只能使用 prompt 中列出的真实字段名\n"
+    "6. 如果某项分析所需的数据字段不存在或为空, 必须输出 '数据不足，无法判断'\n"
     "\n每一条结论必须附带:\n"
     "- confidence_score: 0.0-1.0 (1.0=直接从数据计算, 0.5=部分数据支撑, 无法计算时该字段为null)\n"
-    "- evidence_fields: 支撑该结论的具体数据字段名数组 (如 ['digg_count','comment_count'])\n"
+    "- evidence_fields: 支撑该结论的具体数据字段名数组, 必须是 prompt 中提供的真实字段名 (如 ['follower_count','aweme_count'])\n"
     "请以严格 JSON 格式输出，不要输出任何额外文字或 Markdown 代码块。"
 )
 
@@ -258,22 +259,30 @@ GROWTH_JSON_SCHEMA = """{
 }"""
 
 
-def build_growth_prompt(account_info: str, videos: list[dict] | None = None) -> str:
+def build_growth_prompt(account_info: str, videos: list[dict] | None = None, account_fields: dict | None = None) -> str:
     """构造 evidence-based 聚合分析 prompt"""
     # 明确列出可用数据, 让 AI 知道边界
     has_videos = bool(videos and len(videos) > 0)
     video_count = len(videos) if videos else 0
+    has_account_fields = bool(account_fields)
 
     if has_videos:
         available_fields = set()
         for v in videos:
             available_fields.update(v.keys())
-        fields_str = ", ".join(sorted(available_fields)) or "无"
+        video_fields_str = ", ".join(sorted(available_fields)) or "无"
         missing_str = ""
     else:
-        available_fields = set()
-        fields_str = "无视频数据"
+        video_fields_str = "无视频数据"
         missing_str = "title, desc, digg_count, comment_count, share_count, play_count, create_time"
+
+    # 账号结构化字段
+    if has_account_fields:
+        account_field_names = list(account_fields.keys())
+        account_fields_json = json.dumps(account_fields, ensure_ascii=False, indent=2)
+    else:
+        account_field_names = []
+        account_fields_json = "无结构化字段 (仅纯文本)"
 
     # 构造视频数据文本
     videos_text = "无视频数据"
@@ -290,16 +299,21 @@ def build_growth_prompt(account_info: str, videos: list[dict] | None = None) -> 
 
     return f"""请对以下短视频账号进行 evidence-based 聚合分析。
 
-【账号信息】
+【账号信息 (纯文本)】
 {account_info}
+
+【账号结构化字段 (JSON)】
+以下是可以直接引用为 evidence_fields 的真实字段名及其值:
+{account_fields_json}
 
 【视频数据】
 {videos_text}
 
 【数据可用性】
-- 账号信息: {'有' if account_info.strip() else '无'}
+- 账号信息(纯文本): {'有' if account_info.strip() else '无'}
+- 账号结构化字段: {'有, 字段名: ' + ', '.join(account_field_names) if has_account_fields else '无'}
 - 视频数据: {'有, 共' + str(video_count) + '条' if has_videos else '无'}
-- 视频可用字段: {fields_str}
+- 视频可用字段: {video_fields_str}
 - 视频缺失字段: {missing_str or '无'}
 
 请严格按照以下JSON Schema输出(只输出JSON,不要任何额外文字):
@@ -307,18 +321,22 @@ def build_growth_prompt(account_info: str, videos: list[dict] | None = None) -> 
 
 【核心规则】
 1. data_completeness: 有视频数据=full/partial, 无视频数据=insufficient
-2. 所有视频级指标(high_frequency_keywords/engagement_ranking/posting_time_pattern/like_comment_ratio/top_content_types):
+2. evidence_fields 必须使用上方【账号结构化字段】或【视频可用字段】中列出的真实字段名
+   - 账号级字段: {', '.join(account_field_names) if account_field_names else '无'}
+   - 视频级字段: {video_fields_str if has_videos else '无'}
+   - 禁止编造不存在的字段名
+3. 所有视频级指标(high_frequency_keywords/engagement_ranking/posting_time_pattern/like_comment_ratio/top_content_types):
    - 有视频数据时: 从实际数据计算, confidence_score=1.0
    - 无视频数据时: 对应字段填 status="数据不足，无法判断", confidence_score=null, 其余数值字段填null
-3. actionable_insights: 只输出有数据支撑的结论, 每条必须引用具体数值
-4. 禁止输出任何心理分析、传播模型、情绪推测
-5. high_frequency_keywords: 从视频标题/描述中提取出现>=2次的词, 无视频数据时返回空数组
-6. engagement_ranking: 按总互动量(点赞+评论+转发)降序排列, 无视频数据时返回空数组
-7. 如果只有账号信息没有视频数据, actionable_insights 只能基于账号级别的数值(粉丝数/获赞数/作品数)输出
+4. actionable_insights: 只输出有数据支撑的结论, 每条必须引用具体数值
+5. 禁止输出任何心理分析、传播模型、情绪推测
+6. high_frequency_keywords: 从视频标题/描述中提取出现>=2次的词, 无视频数据时返回空数组
+7. engagement_ranking: 按总互动量(点赞+评论+转发)降序排列, 无视频数据时返回空数组
+8. 如果只有账号信息没有视频数据, actionable_insights 只能基于账号结构化字段的数值输出, evidence_fields 引用真实字段名
 """
 
 
-def _openai_compatible_growth(cfg: dict, account_info: str, videos: list[dict] | None) -> dict:
+def _openai_compatible_growth(cfg: dict, account_info: str, videos: list[dict] | None, account_fields: dict | None = None) -> dict:
     """调用 OpenAI 兼容接口进行增长策略分析"""
     base_url = cfg["base_url"]
     url = f"{base_url}/chat/completions"
@@ -327,7 +345,7 @@ def _openai_compatible_growth(cfg: dict, account_info: str, videos: list[dict] |
         "model": cfg["model"],
         "messages": [
             {"role": "system", "content": GROWTH_SYSTEM_PROMPT},
-            {"role": "user", "content": build_growth_prompt(account_info, videos)},
+            {"role": "user", "content": build_growth_prompt(account_info, videos, account_fields)},
         ],
         "temperature": 0.1,
         "response_format": {"type": "json_object"},
@@ -340,25 +358,26 @@ def _openai_compatible_growth(cfg: dict, account_info: str, videos: list[dict] |
     return _parse_json(text)
 
 
-def _claude_growth(cfg: dict, account_info: str, videos: list[dict] | None) -> dict:
+def _claude_growth(cfg: dict, account_info: str, videos: list[dict] | None, account_fields: dict | None = None) -> dict:
     """调用 Claude 进行增长策略分析"""
     ac = Anthropic(api_key=cfg["api_key"])
     msg = ac.messages.create(
         model=cfg["model"],
         max_tokens=4000,
         system=GROWTH_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": build_growth_prompt(account_info, videos)}],
+        messages=[{"role": "user", "content": build_growth_prompt(account_info, videos, account_fields)}],
     )
     text = msg.content[0].text
     return _parse_json(text)
 
 
-def growth_analyze(account_info: str, videos: list[dict] | None = None) -> dict:
+def growth_analyze(account_info: str, videos: list[dict] | None = None, account_fields: dict | None = None) -> dict:
     """增长策略分析主入口: evidence-based 聚合分析
 
     参数:
         account_info: 账号信息文本(爬虫抓取的content)
         videos: 可选的视频数据列表(含title/desc/digg_count等)
+        account_fields: 可选的账号结构化字段(含follower_count/aweme_count等真实字段名)
 
     返回: 结构化分析结果 + ai_provider 字段
     """
@@ -374,9 +393,9 @@ def growth_analyze(account_info: str, videos: list[dict] | None = None) -> dict:
         provider = cfg["provider"]
         try:
             if provider == "claude":
-                result = _claude_growth(cfg, account_info, videos)
+                result = _claude_growth(cfg, account_info, videos, account_fields)
             else:
-                result = _openai_compatible_growth(cfg, account_info, videos)
+                result = _openai_compatible_growth(cfg, account_info, videos, account_fields)
             result["ai_provider"] = provider
             print(f"[ai_service] 增长策略分析成功, 使用: {cfg['label']}")
             return result

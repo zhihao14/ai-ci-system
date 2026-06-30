@@ -181,7 +181,7 @@ def report_detail(report_id: str):
 
 @app.post("/api/growth-analysis")
 def growth_analysis(req: GrowthAnalysisRequest):
-    """短视频增长策略分析: 爬取账号信息 -> AI 4层分析 -> 返回结构化JSON"""
+    """短视频增长策略分析: 爬取账号信息 -> AI evidence-based 聚合分析"""
     url = req.url.strip()
     videos = req.videos
 
@@ -195,19 +195,23 @@ def growth_analysis(req: GrowthAnalysisRequest):
     if not content.strip():
         raise HTTPException(status_code=422, detail="页面正文为空, 无法分析")
 
+    # 获取结构化字段 (抖音爬虫返回, 其他来源可能没有)
+    account_fields = crawled.get("account_fields")
+
     # 2) AI 增长策略分析
-    result = growth_analyze(content, videos)
+    result = growth_analyze(content, videos, account_fields)
     if result.get("ai_provider") == "none":
         raise HTTPException(
             status_code=503,
             detail=result.get("error", "AI 分析失败, 请检查 AI 配置"),
         )
 
-    # 3) 返回4层结构化结果
+    # 3) 返回结构化结果
     return {
         "url": url,
         "title": title,
         "account_info": content,
+        "account_fields": account_fields,
         "analysis": result,
         "ai_provider": result.get("ai_provider"),
     }
