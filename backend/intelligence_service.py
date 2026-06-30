@@ -95,41 +95,34 @@ def crawl_and_save(url: str, max_videos: int = 50) -> dict:
 
 
 # ============================================================
-# 2. AI 多 Agent 分析 (Pattern + Analysis + Trend)
+# 2. AI 多 Agent 分析 (Pattern + Analysis + Trend) — 分步执行避免超时
 # ============================================================
 
-def run_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
-    """第2步: 运行 PatternAgent + Evidence-based Analysis + Trend Prediction
-
-    Returns: { video_analysis_id, patterns, analysis, trends, ai_provider, rag_context_used }
-    """
+def run_pattern_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
+    """PatternAgent: 内容模式识别 (~20s)"""
     va = get_video_analysis(video_analysis_id)
     if not va:
         raise ValueError(f"视频分析记录不存在: {video_analysis_id}")
 
     videos = va.get("videos") or []
-    account_info = va.get("account_info") or ""
     account_fields = va.get("account_fields") or {}
     account_name = va.get("account_name") or ""
     competitor_id = va.get("competitor_id")
 
-    # 获取 RAG 上下文
     rag_context = ""
     rag_used = False
     if use_rag:
         try:
-            rag_context = get_kb().build_context(f"{account_name} 竞争情报 内容模式 趋势", limit=3)
+            rag_context = get_kb().build_context(f"{account_name} 内容模式", limit=3)
             if rag_context:
                 rag_used = True
         except Exception as e:
             print(f"[intelligence] RAG 检索失败: {e}")
 
-    # ---- 2a. PatternAgent: 内容模式识别 ----
     patterns = None
     try:
         from agents.pattern_agent import _call_ai_for_patterns
         patterns = _call_ai_for_patterns(videos, account_fields, rag_context)
-        # 存入 content_patterns
         insert_content_pattern({
             "video_analysis_id": video_analysis_id,
             "competitor_id": competitor_id,
@@ -141,12 +134,42 @@ def run_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
         print(f"[intelligence] PatternAgent 失败: {e}")
         patterns = {"error": str(e), "ai_provider": "none"}
 
-    # ---- 2b. Evidence-based Analysis (复用 ai_service.growth_analyze) ----
+    try:
+        if patterns.get("ai_provider") != "none":
+            get_kb().store_entry(
+                competitor_id=competitor_id,
+                content_type="pattern",
+                title=f"{account_name} - 内容模式识别",
+                content=json.dumps(patterns, ensure_ascii=False),
+                metadata={},
+            )
+    except Exception as e:
+        print(f"[intelligence] RAG 存储失败: {e}")
+
+    return {
+        "video_analysis_id": video_analysis_id,
+        "patterns": patterns,
+        "ai_provider": patterns.get("ai_provider", "none"),
+        "rag_context_used": rag_used,
+    }
+
+
+def run_growth_analysis(video_analysis_id: str) -> dict:
+    """Evidence-based Analysis (~55s)"""
+    va = get_video_analysis(video_analysis_id)
+    if not va:
+        raise ValueError(f"视频分析记录不存在: {video_analysis_id}")
+
+    videos = va.get("videos") or []
+    account_info = va.get("account_info") or ""
+    account_fields = va.get("account_fields") or {}
+    account_name = va.get("account_name") or ""
+    competitor_id = va.get("competitor_id")
+
     analysis = None
     try:
         from ai_service import growth_analyze
         analysis = growth_analyze(account_info, videos, account_fields)
-        # 更新 video_analyses 的 analysis 字段
         update_video_analysis(video_analysis_id, {
             "analysis": analysis,
             "ai_provider": analysis.get("ai_provider", "none"),
@@ -155,7 +178,47 @@ def run_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
         print(f"[intelligence] Evidence-based Analysis 失败: {e}")
         analysis = {"error": str(e), "ai_provider": "none"}
 
-    # ---- 2c. Trend Prediction ----
+    try:
+        if analysis.get("ai_provider") != "none":
+            summary = analysis.get("summary") or json.dumps(analysis, ensure_ascii=False)[:500]
+            get_kb().store_entry(
+                competitor_id=competitor_id,
+                content_type="analysis",
+                title=f"{account_name} - 竞争情报分析",
+                content=summary,
+                metadata={"analysis_keys": list(analysis.keys())},
+            )
+    except Exception as e:
+        print(f"[intelligence] RAG 存储失败: {e}")
+
+    return {
+        "video_analysis_id": video_analysis_id,
+        "analysis": analysis,
+        "ai_provider": analysis.get("ai_provider", "none"),
+    }
+
+
+def run_trend_prediction(video_analysis_id: str, use_rag: bool = True) -> dict:
+    """Trend Prediction Engine (~20s)"""
+    va = get_video_analysis(video_analysis_id)
+    if not va:
+        raise ValueError(f"视频分析记录不存在: {video_analysis_id}")
+
+    videos = va.get("videos") or []
+    account_fields = va.get("account_fields") or {}
+    account_name = va.get("account_name") or ""
+    competitor_id = va.get("competitor_id")
+
+    rag_context = ""
+    rag_used = False
+    if use_rag:
+        try:
+            rag_context = get_kb().build_context(f"{account_name} 趋势预测", limit=3)
+            if rag_context:
+                rag_used = True
+        except Exception as e:
+            print(f"[intelligence] RAG 检索失败: {e}")
+
     trends = None
     try:
         trends = _predict_trends(videos, account_fields, rag_context)
@@ -170,25 +233,39 @@ def run_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
         print(f"[intelligence] Trend Prediction 失败: {e}")
         trends = {"error": str(e), "ai_provider": "none"}
 
-    # ---- 存入 RAG 知识库 ----
     try:
-        get_kb().store_analysis(
-            competitor_id=competitor_id,
-            account_name=account_name,
-            analysis=analysis if analysis.get("ai_provider") != "none" else None,
-            patterns=patterns if patterns.get("ai_provider") != "none" else None,
-            trends=trends if trends.get("ai_provider") != "none" else None,
-        )
+        if trends.get("ai_provider") != "none":
+            get_kb().store_entry(
+                competitor_id=competitor_id,
+                content_type="trend",
+                title=f"{account_name} - 趋势预测",
+                content=json.dumps(trends, ensure_ascii=False),
+                metadata={},
+            )
     except Exception as e:
         print(f"[intelligence] RAG 存储失败: {e}")
 
     return {
         "video_analysis_id": video_analysis_id,
-        "patterns": patterns,
-        "analysis": analysis,
         "trends": trends,
-        "ai_provider": (patterns or {}).get("ai_provider", "none"),
+        "ai_provider": trends.get("ai_provider", "none"),
         "rag_context_used": rag_used,
+    }
+
+
+def run_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
+    """运行所有3个分析步骤 (本地调试用, Railway 请用 step 分步接口)"""
+    pattern_result = run_pattern_analysis(video_analysis_id, use_rag)
+    growth_result = run_growth_analysis(video_analysis_id)
+    trend_result = run_trend_prediction(video_analysis_id, use_rag)
+
+    return {
+        "video_analysis_id": video_analysis_id,
+        "patterns": pattern_result["patterns"],
+        "analysis": growth_result["analysis"],
+        "trends": trend_result["trends"],
+        "ai_provider": pattern_result.get("ai_provider", "none"),
+        "rag_context_used": pattern_result.get("rag_context_used") or trend_result.get("rag_context_used"),
     }
 
 

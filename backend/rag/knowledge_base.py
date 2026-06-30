@@ -40,19 +40,31 @@ class KnowledgeBase:
     def search(self, query: str, limit: int = 5) -> list[dict]:
         """全文检索知识库
 
-        使用 Supabase textSearch 对 search_vector 做全文检索,
-        返回匹配度排序的结果。
+        优先使用 tsvector 全文检索, 失败时回退到 ilike 模糊搜索。
         """
         sb = get_supabase()
-        res = (
-            sb.table("knowledge_base")
-            .select("id, competitor_id, content_type, title, content, metadata, created_at")
-            .text_search("search_vector", query, {"type": "websearch", "config": "simple"})
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        return res.data or []
+        try:
+            res = (
+                sb.table("knowledge_base")
+                .select("id, competitor_id, content_type, title, content, metadata, created_at")
+                .text_search("search_vector", query)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return res.data or []
+        except Exception:
+            # 回退: ilike 模糊搜索 title + content
+            safe_q = query.replace("%", "\\%").replace("_", "\\_")
+            res = (
+                sb.table("knowledge_base")
+                .select("id, competitor_id, content_type, title, content, metadata, created_at")
+                .or_(f"title.ilike.%{safe_q}%,content.ilike.%{safe_q}%")
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return res.data or []
 
     def build_context(self, query: str, limit: int = 3) -> str:
         """构造 RAG 上下文文本, 供 AI prompt 注入

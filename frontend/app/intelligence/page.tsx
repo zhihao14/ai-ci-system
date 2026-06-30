@@ -62,6 +62,12 @@ interface StrategyResult {
 
 const STEPS = ["Crawl", "Analyze", "Strategy"];
 
+const ANALYZE_SUB_STEPS = [
+  { key: "pattern", label: "内容模式识别" },
+  { key: "growth", label: "Evidence-based 分析" },
+  { key: "trend", label: "趋势预测" },
+] as const;
+
 export default function IntelligencePage() {
   const [url, setUrl] = useState("");
   const [step, setStep] = useState(0);
@@ -70,6 +76,8 @@ export default function IntelligencePage() {
   const [crawl, setCrawl] = useState<CrawlResult | null>(null);
   const [analyze, setAnalyze] = useState<AnalyzeResult | null>(null);
   const [strategy, setStrategy] = useState<StrategyResult | null>(null);
+  // 分析子步骤: "" | "pattern" | "growth" | "trend"
+  const [analyzeStep, setAnalyzeStep] = useState<string>("");
 
   const api = async (path: string, body: unknown) => {
     const res = await fetch(`/api/intelligence/${path}`, {
@@ -112,11 +120,45 @@ export default function IntelligencePage() {
     runStep(1, "crawl", { url }, (d) => setCrawl(d as CrawlResult));
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!crawl?.video_analysis_id) return;
-    runStep(2, "analyze", { video_analysis_id: crawl.video_analysis_id }, (d) =>
-      setAnalyze(d as AnalyzeResult)
-    );
+    setLoading(2);
+    setError(null);
+    setAnalyze(null);
+
+    const id = crawl.video_analysis_id;
+    const acc: AnalyzeResult = {};
+
+    try {
+      // Step 2a: Pattern
+      setAnalyzeStep("pattern");
+      const pr = await api("analyze", { video_analysis_id: id, step: "pattern" });
+      acc.patterns = pr.patterns;
+      acc.ai_provider = pr.ai_provider;
+      setAnalyze({ ...acc });
+
+      // Step 2b: Growth (Evidence-based)
+      setAnalyzeStep("growth");
+      const gr = await api("analyze", { video_analysis_id: id, step: "growth" });
+      acc.analysis = gr.analysis;
+      if (gr.ai_provider && gr.ai_provider !== "none") acc.ai_provider = gr.ai_provider;
+      setAnalyze({ ...acc });
+
+      // Step 2c: Trend
+      setAnalyzeStep("trend");
+      const tr = await api("analyze", { video_analysis_id: id, step: "trend" });
+      acc.trends = tr.trends;
+      if (tr.ai_provider && tr.ai_provider !== "none") acc.ai_provider = tr.ai_provider;
+      setAnalyze({ ...acc });
+
+      setStep(2);
+      setAnalyzeStep("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "未知错误");
+      setAnalyzeStep("");
+    } finally {
+      setLoading(null);
+    }
   };
 
   const handleStrategy = () => {
@@ -276,7 +318,42 @@ export default function IntelligencePage() {
             ) : (
               <p className="text-sm text-slate-400">未获取到视频列表</p>
             )}
-            {primaryBtn("Step 2: AI 模式分析", "分析中...", 2, handleAnalyze)}
+            {primaryBtn(
+              "Step 2: AI 模式分析",
+              loading === 2 && analyzeStep
+                ? `分析中: ${ANALYZE_SUB_STEPS.find((s) => s.key === analyzeStep)?.label || "..."}`
+                : "分析中...",
+              2,
+              handleAnalyze
+            )}
+            {/* 子步骤进度 */}
+            {loading === 2 && (
+              <div className="mt-3 flex items-center gap-2">
+                {ANALYZE_SUB_STEPS.map((ss, si) => {
+                  const ssDone = analyzeStep && ANALYZE_SUB_STEPS.findIndex((x) => x.key === analyzeStep) > si;
+                  const ssActive = analyzeStep === ss.key;
+                  return (
+                    <div key={ss.key} className="flex items-center gap-2">
+                      <div
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+                          ssDone
+                            ? "bg-emerald-500 text-white"
+                            : ssActive
+                            ? "animate-pulse bg-indigo-500 text-white"
+                            : "bg-slate-200 text-slate-400"
+                        }`}
+                      >
+                        {ssDone ? "✓" : si + 1}
+                      </div>
+                      <span className={`text-xs ${ssActive ? "font-semibold text-indigo-700" : "text-slate-400"}`}>
+                        {ss.label}
+                      </span>
+                      {si < ANALYZE_SUB_STEPS.length - 1 && <span className="text-slate-300">→</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </SectionCard>
         </div>
       )}

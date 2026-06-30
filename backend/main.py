@@ -362,15 +362,32 @@ def intelligence_crawl(req: GrowthAnalysisRequest):
 
 @app.post("/api/intelligence/analyze")
 def intelligence_analyze(req: dict):
-    """第2步: Multi-Agent 分析 (Pattern + Analysis + Trend) (~40s)"""
-    from intelligence_service import run_analysis
+    """第2步: Multi-Agent 分析 (分步执行避免 Railway 60s 超时)
+
+    step 参数:
+    - "pattern": PatternAgent 内容模式识别 (~20s)
+    - "growth":  Evidence-based Analysis (~55s)
+    - "trend":   Trend Prediction Engine (~20s)
+    - "all":     运行全部 (本地调试用, Railway 会超时)
+    """
     analysis_id = req.get("video_analysis_id")
     use_rag = req.get("use_rag", True)
+    step = req.get("step", "all")
     if not analysis_id:
         raise HTTPException(status_code=422, detail="video_analysis_id 必填")
     try:
-        result = run_analysis(analysis_id, use_rag)
-        return result
+        if step == "pattern":
+            from intelligence_service import run_pattern_analysis
+            return run_pattern_analysis(analysis_id, use_rag)
+        elif step == "growth":
+            from intelligence_service import run_growth_analysis
+            return run_growth_analysis(analysis_id)
+        elif step == "trend":
+            from intelligence_service import run_trend_prediction
+            return run_trend_prediction(analysis_id, use_rag)
+        else:
+            from intelligence_service import run_analysis
+            return run_analysis(analysis_id, use_rag)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -418,8 +435,11 @@ def knowledge_search(req: dict):
     limit = req.get("limit", 5)
     if not query:
         raise HTTPException(status_code=422, detail="query 必填")
-    results = get_kb().search(query, limit=limit)
-    return {"results": results, "count": len(results)}
+    try:
+        results = get_kb().search(query, limit=limit)
+        return {"results": results, "count": len(results)}
+    except Exception as e:
+        return {"results": [], "count": 0, "error": str(e)[:200]}
 
 
 @app.get("/api/intelligence/analyses")
