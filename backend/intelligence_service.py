@@ -155,7 +155,7 @@ def run_pattern_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
 
 
 def run_growth_analysis(video_analysis_id: str) -> dict:
-    """Evidence-based Analysis (~55s)"""
+    """Evidence-based Analysis (~40s, 优化数据量避免超时)"""
     va = get_video_analysis(video_analysis_id)
     if not va:
         raise ValueError(f"视频分析记录不存在: {video_analysis_id}")
@@ -166,10 +166,18 @@ def run_growth_analysis(video_analysis_id: str) -> dict:
     account_name = va.get("account_name") or ""
     competitor_id = va.get("competitor_id")
 
+    # 优化: 截断 account_info 到 500 字符, 视频取互动量前 10 条
+    account_info_trimmed = account_info[:500] if len(account_info) > 500 else account_info
+    top_videos = sorted(
+        videos,
+        key=lambda v: (v.get("digg_count") or 0) + (v.get("comment_count") or 0) + (v.get("share_count") or 0),
+        reverse=True,
+    )[:10]
+
     analysis = None
     try:
         from ai_service import growth_analyze
-        analysis = growth_analyze(account_info, videos, account_fields)
+        analysis = growth_analyze(account_info_trimmed, top_videos, account_fields)
         update_video_analysis(video_analysis_id, {
             "analysis": analysis,
             "ai_provider": analysis.get("ai_provider", "none"),
