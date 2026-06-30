@@ -268,21 +268,23 @@ def generate_executive_summary(video_analysis_id: str) -> dict:
 
     brief_json = json.dumps(brief, ensure_ascii=False, indent=2)
 
-    prompt = f"""你是一名竞争情报分析师。请为以下竞争对手撰写高管摘要。
+    prompt = f"""你是一名商业分析师。请为以下竞争对手撰写高管摘要。
+
+用通俗的语言，像给老板做汇报一样。不要用技术术语。
 
 数据简报:
 {brief_json}
 
 请撰写简洁的高管摘要（3-4句话，最多200字）。内容覆盖：
 1. 他们是谁以及市场地位
-2. 关键优势（最高得分维度）
-3. 关键威胁或弱点（最低得分维度）
-4. 一句话战略建议
+2. 他最大的强项是什么
+3. 他最大的弱点是什么
+4. 一句话给出超越他的建议
 
 同时提取3个关键指标作为要点。
 
 以 JSON 格式输出:
-{{"headline": "一行标题（最多80字）", "summary": "3-4句高管摘要", "key_metrics": ["指标1", "指标2", "指标3"], "recommendation": "一句话战略建议"}}
+{{"headline": "一行标题（最多80字）", "summary": "3-4句高管摘要", "key_metrics": ["指标1", "指标2", "指标3"], "recommendation": "一句话给出超越他的建议"}}
 """
 
     for cfg in configs:
@@ -293,7 +295,7 @@ def generate_executive_summary(video_analysis_id: str) -> dict:
                 ac = Anthropic(api_key=cfg["api_key"])
                 msg = ac.messages.create(
                     model=cfg["model"], max_tokens=1000,
-                    system="你是一名竞争情报分析师。只输出JSON，用中文撰写。",
+                    system="你是一名商业分析师。只输出JSON，用中文撰写。用通俗的语言，像给老板做汇报一样。不要用技术术语。",
                     messages=[{"role": "user", "content": prompt}],
                 )
                 text = msg.content[0].text
@@ -304,7 +306,7 @@ def generate_executive_summary(video_analysis_id: str) -> dict:
                 payload = {
                     "model": cfg["model"],
                     "messages": [
-                        {"role": "system", "content": "你是一名竞争情报分析师。只输出JSON，用中文撰写。"},
+                        {"role": "system", "content": "你是一名商业分析师。只输出JSON，用中文撰写。用通俗的语言，像给老板做汇报一样。不要用技术术语。"},
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.2,
@@ -411,7 +413,7 @@ def detect_threats(video_analysis_id: str) -> dict:
                 "type": "engagement_spike",
                 "severity": "high" if spike_ratio > 5 else "medium",
                 "title": f"互动量激增（{spike_ratio:.1f}倍于均值）",
-                "description": f"最高互动视频总互动量达 {top_engagement}，是账号平均值的 {spike_ratio:.1f} 倍。该内容模式可能具有可复制性。",
+                "description": f"最高互动视频总互动量达 {top_engagement}，是账号平均值的 {spike_ratio:.1f} 倍。这种内容做法可能有参考价值。",
                 "evidence": f"最高视频互动={top_engagement}, 平均={avg_engagement:.0f}",
                 "confidence_score": 0.85,
                 "impact": "high",
@@ -538,12 +540,14 @@ def generate_counter_strategy(video_analysis_id: str) -> dict:
 
     brief_json = json.dumps(brief, ensure_ascii=False, indent=2)
 
-    prompt = f"""你是一名竞争策略顾问。请针对以下竞争对手生成反制策略。
+    prompt = f"""你是一名商业策略顾问。请针对以下竞争对手生成超越策略。
+
+用通俗易懂的商业语言，不要用技术术语。像给老板写行动方案一样。
 
 竞争对手情报简报:
 {brief_json}
 
-请生成3-4条反制策略，针对其薄弱维度并中和其威胁。
+请生成3-4条超越策略，针对他的弱点并中和其威胁。
 每条策略必须包含具体、可执行的战术。
 
 以 JSON 格式输出:
@@ -551,7 +555,7 @@ def generate_counter_strategy(video_analysis_id: str) -> dict:
   "counter_strategies": [
     {{
       "tactic": "简短策略名称",
-      "target_weakness": "要利用的维度/威胁",
+      "target_weakness": "要利用的弱点",
       "action_plan": "2-3句话行动方案",
       "timeline": "immediate|1_month|3_months",
       "expected_impact": "预期效果",
@@ -559,7 +563,7 @@ def generate_counter_strategy(video_analysis_id: str) -> dict:
       "confidence_score": 0.8
     }}
   ],
-  "overall_approach": "一句话总结反制策略方向"
+  "overall_approach": "一句话总结如何超越他"
 }}
 """
 
@@ -571,7 +575,7 @@ def generate_counter_strategy(video_analysis_id: str) -> dict:
                 ac = Anthropic(api_key=cfg["api_key"])
                 msg = ac.messages.create(
                     model=cfg["model"], max_tokens=2000,
-                    system="你是一名竞争策略顾问。只输出JSON，用中文撰写。tactic和overall_approach用中文，timeline和priority用英文枚举值。",
+                    system="你是一名商业策略顾问。只输出JSON，用中文撰写。tactic和overall_approach用中文，timeline和priority用英文枚举值。用通俗易懂的商业语言，不要用技术术语。像给老板写行动方案一样。",
                     messages=[{"role": "user", "content": prompt}],
                 )
                 text = msg.content[0].text
@@ -582,7 +586,7 @@ def generate_counter_strategy(video_analysis_id: str) -> dict:
                 payload = {
                     "model": cfg["model"],
                     "messages": [
-                        {"role": "system", "content": "你是一名竞争策略顾问。只输出JSON，用中文撰写。tactic和overall_approach用中文，timeline和priority用英文枚举值。"},
+                        {"role": "system", "content": "你是一名商业策略顾问。只输出JSON，用中文撰写。tactic和overall_approach用中文，timeline和priority用英文枚举值。用通俗易懂的商业语言，不要用技术术语。像给老板写行动方案一样。"},
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.3,

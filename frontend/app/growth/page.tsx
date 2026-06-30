@@ -98,42 +98,6 @@ interface VideoData {
   video_url: string | null;
 }
 
-// ---- 置信度颜色 ----
-function confidenceColor(score: number | null): string {
-  if (score === null) return "bg-slate-200 text-slate-500";
-  if (score >= 0.8) return "bg-emerald-100 text-emerald-700";
-  if (score >= 0.5) return "bg-amber-100 text-amber-700";
-  return "bg-rose-100 text-rose-700";
-}
-
-function confidenceLabel(score: number | null): string {
-  if (score === null) return "无数据";
-  if (score >= 0.8) return "高置信";
-  if (score >= 0.5) return "中置信";
-  return "低置信";
-}
-
-function ConfidenceBadge({ score }: { score: number | null }) {
-  return (
-    <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${confidenceColor(score)}`}>
-      {score !== null ? `${(score * 100).toFixed(0)}%` : "—"} · {confidenceLabel(score)}
-    </span>
-  );
-}
-
-function EvidenceTags({ fields }: { fields: string[] }) {
-  if (!fields || fields.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {fields.map((f, i) => (
-        <span key={i} className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
-          {f}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function InsufficientBanner() {
   return (
     <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
@@ -219,7 +183,7 @@ export default function GrowthPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">短视频数据分析</h1>
           <p className="text-sm text-slate-500">
-            数据聚合分析 · 基于数据证据 · 每条结论附置信度
+            全面分析对手内容规律与数据亮点
           </p>
         </div>
         <a
@@ -424,10 +388,6 @@ export default function GrowthPage() {
                           ×{kw.occurrence_count}
                         </span>
                       </div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <ConfidenceBadge score={kw.confidence_score} />
-                        <EvidenceTags fields={kw.evidence_fields} />
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -452,8 +412,7 @@ export default function GrowthPage() {
                         <th className="pb-2 pr-3 text-right font-medium">点赞</th>
                         <th className="pb-2 pr-3 text-right font-medium">评论</th>
                         <th className="pb-2 pr-3 text-right font-medium">转发</th>
-                        <th className="pb-2 pr-3 text-right font-medium">总量</th>
-                        <th className="pb-2 text-right font-medium">置信度</th>
+                        <th className="pb-2 text-right font-medium">总量</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -475,9 +434,6 @@ export default function GrowthPage() {
                           <td className="py-2 pr-3 text-right font-semibold text-slate-800">
                             {item.total_engagement?.toLocaleString() ?? "—"}
                           </td>
-                          <td className="py-2 text-right">
-                            <ConfidenceBadge score={item.confidence_score} />
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -493,9 +449,8 @@ export default function GrowthPage() {
                 <InsufficientBanner />
               ) : (
                 <div className="rounded-xl border border-slate-200 p-4">
-                  <div className="mb-3 flex items-center justify-between">
+                  <div className="mb-3">
                     <span className="text-xs font-medium text-slate-400">高频时段</span>
-                    <ConfidenceBadge score={a.aggregate_analysis?.posting_time_pattern?.confidence_score ?? null} />
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {(a.aggregate_analysis?.posting_time_pattern?.peak_hours || []).map((h, i) => (
@@ -516,9 +471,6 @@ export default function GrowthPage() {
                       </div>
                     </div>
                   )}
-                  <div className="mt-2">
-                    <EvidenceTags fields={a.aggregate_analysis?.posting_time_pattern?.evidence_fields || []} />
-                  </div>
                 </div>
               )}
             </div>
@@ -530,9 +482,8 @@ export default function GrowthPage() {
                 <InsufficientBanner />
               ) : (
                 <div className="rounded-xl border border-slate-200 p-4">
-                  <div className="mb-3 flex items-center justify-between">
+                  <div className="mb-3">
                     <span className="text-xs font-medium text-slate-400">平均比值</span>
-                    <ConfidenceBadge score={a.aggregate_analysis?.like_comment_ratio?.confidence_score ?? null} />
                   </div>
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
@@ -554,9 +505,6 @@ export default function GrowthPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <EvidenceTags fields={a.aggregate_analysis?.like_comment_ratio?.evidence_fields || []} />
-                  </div>
                 </div>
               )}
             </div>
@@ -570,16 +518,12 @@ export default function GrowthPage() {
                 <div className="space-y-2">
                   {a.aggregate_analysis.top_content_types.map((ct, i) => (
                     <div key={i} className="rounded-xl border border-slate-200 p-3">
-                      <div className="flex items-center justify-between">
+                      <div>
                         <span className="text-sm font-medium text-slate-800">{ct.content_type}</span>
-                        <ConfidenceBadge score={ct.confidence_score} />
                       </div>
                       <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
                         <span>视频数: {ct.video_count ?? "—"}</span>
                         <span>平均互动: {ct.avg_engagement?.toLocaleString() ?? "—"}</span>
-                      </div>
-                      <div className="mt-1">
-                        <EvidenceTags fields={ct.evidence_fields} />
                       </div>
                     </div>
                   ))}
@@ -590,7 +534,7 @@ export default function GrowthPage() {
 
           {/* ===== 可执行结论 ===== */}
           <section className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h3 className="mb-4 text-lg font-bold text-slate-900">数据驱动结论</h3>
+            <h3 className="mb-4 text-lg font-bold text-slate-900">核心结论</h3>
             {!a.actionable_insights?.length ? (
               <p className="text-sm text-slate-400">无可用数据结论</p>
             ) : (
@@ -603,16 +547,6 @@ export default function GrowthPage() {
                       </span>
                       <div className="flex-1">
                         <p className="text-sm text-slate-800">{insight.insight}</p>
-                        {insight.supporting_data && (
-                          <p className="mt-2 rounded-lg bg-white/60 px-3 py-1.5 text-xs text-slate-600">
-                            <span className="font-medium text-indigo-600">数据支撑: </span>
-                            {insight.supporting_data}
-                          </p>
-                        )}
-                        <div className="mt-2 flex items-center gap-3">
-                          <ConfidenceBadge score={insight.confidence_score} />
-                          <EvidenceTags fields={insight.evidence_fields} />
-                        </div>
                       </div>
                     </div>
                   </div>

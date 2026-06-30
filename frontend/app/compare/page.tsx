@@ -2,7 +2,7 @@
 
 // compare/page.tsx — 多竞争对手对比: 选择已有分析 → 对比矩阵 / 竞争格局 / SWOT / 建议
 import { useEffect, useState } from "react";
-import { ConfidenceBadge, Items, SectionCard } from "@/components/result-display";
+import { Items, SectionCard } from "@/components/result-display";
 import { useI18n } from "@/lib/i18n";
 
 // ---- 类型 ----
@@ -220,11 +220,10 @@ export default function ComparePage() {
                   const o = c as Record<string, unknown>;
                   return (
                     <div key={i} className="rounded-xl border border-slate-200 p-4">
-                      <div className="mb-2 flex items-center justify-between">
+                      <div className="mb-2">
                         <span className="text-sm font-semibold text-slate-900">
                           {String(o.competitor ?? o.name ?? "—")}
                         </span>
-                        <ConfidenceBadge score={(o.confidence_score as number) ?? null} />
                       </div>
                       <dl className="space-y-1">
                         {Object.entries(o)

@@ -31,6 +31,7 @@ DEFAULT_BASE_URLS = {
 SYSTEM_PROMPT = (
     "你是一名资深竞争情报分析师。请根据给定的网页正文, 提炼竞争对手情报, "
     "并以严格 JSON 格式输出, 不要输出任何额外文字或 Markdown 代码块。"
+    "你的分析报告要像给老板看的商业报告，用通俗语言，不要用技术术语。"
 )
 
 
@@ -174,22 +175,23 @@ def analyze(title: str, content: str) -> dict:
 
 
 # ============================================================
-# 短视频增长策略分析 (evidence-based 聚合分析)
+# 短视频增长策略分析 (全面的数据分析)
 # ============================================================
 
 GROWTH_SYSTEM_PROMPT = (
     "你是一个严格基于数据的短视频内容分析师。"
     "你的唯一职责是对提供的账号信息和视频数据进行聚合统计与事实性分析。"
+    "你的分析报告要像给老板看的商业报告，用通俗语言，不要用技术术语。"
     "\n\n【绝对禁止】以下行为:\n"
     "1. 禁止推测用户心理、情绪、动机\n"
     "2. 禁止编造传播模型或抽象理论框架\n"
     "3. 禁止虚构未提供的视频标题、数据或内容\n"
     "4. 禁止基于账号简介推测视频内容特征\n"
-    "5. 禁止编造不存在的字段名: evidence_fields 只能使用 prompt 中列出的真实字段名\n"
+    "5. 禁止编造不存在的字段名: 数据来源只能使用 prompt 中列出的真实字段名\n"
     "6. 如果某项分析所需的数据字段不存在或为空, 必须输出 '数据不足，无法判断'\n"
     "\n每一条结论必须附带:\n"
-    "- confidence_score: 0.0-1.0 (1.0=直接从数据计算, 0.5=部分数据支撑, 无法计算时该字段为null)\n"
-    "- evidence_fields: 支撑该结论的具体数据字段名数组, 必须是 prompt 中提供的真实字段名 (如 ['follower_count','aweme_count'])\n"
+    "- confidence_score: 0.0-1.0 (1.0=直接从数据计算, 0.5=部分数据来源, 无法计算时该字段为null)\n"
+    "- evidence_fields: 支撑该结论的具体数据来源字段名数组, 必须是 prompt 中提供的真实字段名 (如 ['follower_count','aweme_count'])\n"
     "请以严格 JSON 格式输出，不要输出任何额外文字或 Markdown 代码块。"
 )
 
@@ -260,7 +262,7 @@ GROWTH_JSON_SCHEMA = """{
 
 
 def build_growth_prompt(account_info: str, videos: list[dict] | None = None, account_fields: dict | None = None) -> str:
-    """构造 evidence-based 聚合分析 prompt"""
+    """构造全面的数据分析 prompt"""
     # 明确列出可用数据, 让 AI 知道边界
     has_videos = bool(videos and len(videos) > 0)
     video_count = len(videos) if videos else 0
@@ -306,13 +308,13 @@ def build_growth_prompt(account_info: str, videos: list[dict] | None = None, acc
             )
         videos_text = "\n".join(lines)
 
-    return f"""请对以下短视频账号进行 evidence-based 聚合分析。
+    return f"""请对以下短视频账号进行全面的数据分析。
 
 【账号信息 (纯文本)】
 {account_info}
 
 【账号结构化字段 (JSON)】
-以下是可以直接引用为 evidence_fields 的真实字段名及其值:
+以下是可以直接引用为数据来源的真实字段名及其值:
 {account_fields_json}
 
 【视频数据】
@@ -330,18 +332,18 @@ def build_growth_prompt(account_info: str, videos: list[dict] | None = None, acc
 
 【核心规则】
 1. data_completeness: 有视频数据=full/partial, 无视频数据=insufficient
-2. evidence_fields 必须使用上方【账号结构化字段】或【视频可用字段】中列出的真实字段名
+2. 数据来源必须使用上方【账号结构化字段】或【视频可用字段】中列出的真实字段名
    - 账号级字段: {', '.join(account_field_names) if account_field_names else '无'}
    - 视频级字段: {video_fields_str if has_videos else '无'}
    - 禁止编造不存在的字段名
 3. 所有视频级指标(high_frequency_keywords/engagement_ranking/posting_time_pattern/like_comment_ratio/top_content_types):
    - 有视频数据时: 从实际数据计算, confidence_score=1.0
    - 无视频数据时: 对应字段填 status="数据不足，无法判断", confidence_score=null, 其余数值字段填null
-4. actionable_insights: 只输出有数据支撑的结论, 每条必须引用具体数值
+4. actionable_insights: 只输出有数据来源的结论, 每条必须引用具体数值
 5. 禁止输出任何心理分析、传播模型、情绪推测
 6. high_frequency_keywords: 从视频标题/描述中提取出现>=2次的词, 无视频数据时返回空数组
 7. engagement_ranking: 按总互动量(点赞+评论+转发)降序排列, 无视频数据时返回空数组
-8. 如果只有账号信息没有视频数据, actionable_insights 只能基于账号结构化字段的数值输出, evidence_fields 引用真实字段名
+8. 如果只有账号信息没有视频数据, actionable_insights 只能基于账号结构化字段的数值输出, 数据来源引用真实字段名
 """
 
 
@@ -382,7 +384,7 @@ def _claude_growth(cfg: dict, account_info: str, videos: list[dict] | None, acco
 
 
 def growth_analyze(account_info: str, videos: list[dict] | None = None, account_fields: dict | None = None) -> dict:
-    """增长策略分析主入口: evidence-based 聚合分析
+    """增长策略分析主入口: 全面的数据分析
 
     参数:
         account_info: 账号信息文本(爬虫抓取的content)

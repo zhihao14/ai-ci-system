@@ -64,9 +64,9 @@ interface StrategyResult {
 const STEPS = ["爬取", "分析", "策略"];
 
 const ANALYZE_SUB_STEPS = [
-  { key: "pattern", label: "内容模式识别" },
-  { key: "growth", label: "数据分析" },
-  { key: "trend", label: "趋势预测" },
+  { key: "pattern", label: "总结内容规律" },
+  { key: "growth", label: "挖掘数据亮点" },
+  { key: "trend", label: "预判未来走势" },
 ] as const;
 
 export default function IntelligencePage() {
