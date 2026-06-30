@@ -17,7 +17,15 @@
     "unknownError": "Unknown Error",
     "requestFailed": "Request Failed",
     "language": "Language",
-    "videos": "videos"
+    "videos": "videos",
+    "severity_high": "High",
+    "severity_medium": "Medium",
+    "severity_low": "Low",
+    "threatLevel_critical": "Critical",
+    "threatLevel_high": "High",
+    "threatLevel_moderate": "Moderate",
+    "threatLevel_low": "Low",
+    "threatLevel_minimal": "Minimal"
   },
   "dashboard": {
     "title": "Intelligence Dashboard",
@@ -51,7 +59,21 @@
     "counterFailed": "Failed to generate counter-strategies",
     "target": "Target",
     "timeline": "Timeline",
-    "impactLabel": "Impact"
+    "impactLabel": "Impact",
+    "dim_reach": "Reach",
+    "dim_engagement": "Engagement",
+    "dim_consistency": "Consistency",
+    "dim_virality": "Virality",
+    "dim_content_depth": "Content Depth",
+    "bar_likes": "Likes",
+    "bar_comments": "Comments",
+    "bar_shares": "Shares",
+    "priority_high": "High",
+    "priority_medium": "Medium",
+    "priority_low": "Low",
+    "timeline_immediate": "Immediate",
+    "timeline_1_month": "1 Month",
+    "timeline_3_months": "3 Months"
   },
   "intelligence": {
     "title": "Intelligence Analysis",

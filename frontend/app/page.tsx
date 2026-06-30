@@ -208,20 +208,20 @@ export default function DashboardHomePage() {
   // ---- Radar chart data ----
   const radarData = score
     ? [
-        { dimension: "Reach", value: score.dimensions.reach, fullMark: 100 },
-        { dimension: "Engagement", value: score.dimensions.engagement, fullMark: 100 },
-        { dimension: "Consistency", value: score.dimensions.consistency, fullMark: 100 },
-        { dimension: "Virality", value: score.dimensions.virality, fullMark: 100 },
-        { dimension: "Content Depth", value: score.dimensions.content_depth, fullMark: 100 },
+        { dimension: t("dashboard.dim_reach"), value: score.dimensions.reach, fullMark: 100 },
+        { dimension: t("dashboard.dim_engagement"), value: score.dimensions.engagement, fullMark: 100 },
+        { dimension: t("dashboard.dim_consistency"), value: score.dimensions.consistency, fullMark: 100 },
+        { dimension: t("dashboard.dim_virality"), value: score.dimensions.virality, fullMark: 100 },
+        { dimension: t("dashboard.dim_content_depth"), value: score.dimensions.content_depth, fullMark: 100 },
       ]
     : [];
 
   // ---- Engagement bar chart data ----
   const engagementBars = score?.raw_metrics
     ? [
-        { name: "Likes", value: score.raw_metrics.total_likes, fill: "#3b82f6" },
-        { name: "Comments", value: score.raw_metrics.total_comments, fill: "#8b5cf6" },
-        { name: "Shares", value: score.raw_metrics.total_shares, fill: "#10b981" },
+        { name: t("dashboard.bar_likes"), value: score.raw_metrics.total_likes, fill: "#3b82f6" },
+        { name: t("dashboard.bar_comments"), value: score.raw_metrics.total_comments, fill: "#8b5cf6" },
+        { name: t("dashboard.bar_shares"), value: score.raw_metrics.total_shares, fill: "#10b981" },
       ]
     : [];
 
@@ -499,10 +499,10 @@ export default function DashboardHomePage() {
               <h3 className="text-sm font-bold text-slate-900">{t("dashboard.threatDetection")}</h3>
               {threats && (
                 <span
-                  className="rounded-full px-3 py-1 text-xs font-bold text-white uppercase"
+                  className="rounded-full px-3 py-1 text-xs font-bold text-white"
                   style={{ backgroundColor: threatLevelColors[threats.threat_level] || "#64748b" }}
                 >
-                  {threats.threat_level}
+                  {t(`common.threatLevel_${threats.threat_level}`)}
                 </span>
               )}
             </div>
@@ -520,10 +520,10 @@ export default function DashboardHomePage() {
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="text-sm font-semibold text-slate-900">{th.title}</h4>
                         <span
-                          className="shrink-0 rounded px-2 py-0.5 text-[10px] font-bold uppercase text-white"
+                          className="shrink-0 rounded px-2 py-0.5 text-[10px] font-bold text-white"
                           style={{ backgroundColor: severityColors[th.severity] || "#64748b" }}
                         >
-                          {th.severity}
+                          {t(`common.severity_${th.severity}`)}
                         </span>
                       </div>
                       <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{th.description}</p>
@@ -592,13 +592,13 @@ export default function DashboardHomePage() {
                           </div>
                         </div>
                         <span
-                          className="shrink-0 rounded px-2 py-1 text-[10px] font-bold uppercase text-white"
+                          className="shrink-0 rounded px-2 py-1 text-[10px] font-bold text-white"
                           style={{
                             backgroundColor:
                               s.priority === "high" ? "#ef4444" : s.priority === "medium" ? "#f59e0b" : "#3b82f6",
                           }}
                         >
-                          {s.priority}
+                          {t(`dashboard.priority_${s.priority}`)}
                         </span>
                       </div>
                     </div>
