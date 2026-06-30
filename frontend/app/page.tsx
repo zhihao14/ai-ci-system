@@ -1,7 +1,7 @@
 "use client";
 
 // page.tsx - 主页: 提交分析 + 报告列表 + 详情面板
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import ReportCard from "@/components/ReportCard";
 import ReportDetail from "@/components/ReportDetail";
 import type { Report, ReportSummary } from "./types";
@@ -15,17 +15,22 @@ export default function Home() {
 
   // 报告列表 & 当前选中
   const [reports, setReports] = useState<ReportSummary[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
   const [selected, setSelected] = useState<Report | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
 
   // 拉取报告列表
   const fetchReports = async () => {
+    setReportsLoading(true);
     try {
       const res = await fetch("/api/reports");
       const data = await res.json();
       setReports(data || []);
     } catch {
       /* 后端未启动时忽略 */
+    } finally {
+      setReportsLoading(false);
     }
   };
 
@@ -56,6 +61,10 @@ export default function Home() {
       await fetchReports();
       setUrl("");
       setName("");
+      // 滚动到详情面板
+      setTimeout(() => {
+        detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
@@ -68,10 +77,18 @@ export default function Home() {
     setActiveId(id);
     try {
       const res = await fetch(`/api/reports/${id}`);
+      if (!res.ok) {
+        const msg = await res.json().catch(() => ({}));
+        throw new Error(msg.detail || `请求失败 (${res.status})`);
+      }
       const data: Report = await res.json();
       setSelected(data);
-    } catch {
-      /* 忽略 */
+      // 滚动到详情面板
+      setTimeout(() => {
+        detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "未知错误");
     }
   };
 
@@ -142,14 +159,17 @@ export default function Home() {
                 onClick={() => handleSelect(r.id)}
               />
             ))}
-            {!reports.length && (
+            {!reports.length && !reportsLoading && (
               <p className="text-sm text-slate-400">暂无报告, 提交一个 URL 试试。</p>
+            )}
+            {reportsLoading && !reports.length && (
+              <p className="text-sm text-slate-400">加载中...</p>
             )}
           </div>
         </section>
 
         {/* 详情面板 */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <section ref={detailRef} className="rounded-2xl border border-slate-200 bg-white p-6 scroll-mt-4">
           {selected ? (
             <ReportDetail report={selected} />
           ) : (
