@@ -98,6 +98,226 @@ def crawl_and_save(url: str, max_videos: int = 50) -> dict:
 # 2. AI 多 Agent 分析 (Pattern + Analysis + Trend) — 分步执行避免超时
 # ============================================================
 
+# ---- Python 预计算统计 (避免 AI 超时) ----
+
+import re
+from collections import Counter
+from datetime import datetime
+
+_CN_STOPWORDS = {"的", "了", "是", "在", "我", "有", "和", "就", "不", "人", "都", "一", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着", "看", "好", "这", "那", "他", "她", "它", "们", "个", "中", "来", "对", "下", "但", "把", "给", "为", "什么", "怎么", "这个", "那个", "一个", "可以", "已经", "还是", "或者", "如果", "因为", "所以", "但是", "不过"}
+
+
+def _compute_aggregate_analysis(videos: list[dict], account_fields: dict | None = None) -> dict:
+    """Python 预计算统计分析 (无需 AI, 秒级完成)"""
+    if not videos:
+        return {
+            "high_frequency_keywords": [],
+            "engagement_ranking": [],
+            "posting_time_pattern": {"peak_hours": [], "weekday_distribution": {}, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["create_time"]},
+            "like_comment_ratio": {"average_ratio": None, "min_ratio": None, "max_ratio": None, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["digg_count", "comment_count"]},
+            "top_content_types": [],
+        }
+
+    # 1. 高频关键词
+    word_counter = Counter()
+    for v in videos:
+        text = (v.get("title") or "") + " " + (v.get("desc") or "")
+        # 提取中文词组 (2-6 字) 和英文单词
+        cn_words = re.findall(r"[\u4e00-\u9fff]{2,6}", text)
+        en_words = re.findall(r"[a-zA-Z]{3,}", text)
+        for w in cn_words + en_words:
+            if w not in _CN_STOPWORDS and len(w) >= 2:
+                word_counter[w] += 1
+    high_freq = [
+        {"keyword": kw, "occurrence_count": cnt, "confidence_score": 1.0, "evidence_fields": ["title", "desc"]}
+        for kw, cnt in word_counter.most_common(10) if cnt >= 2
+    ]
+
+    # 2. 互动量排名
+    ranked = sorted(
+        videos,
+        key=lambda v: (v.get("digg_count") or 0) + (v.get("comment_count") or 0) + (v.get("share_count") or 0),
+        reverse=True,
+    )[:5]
+    engagement_ranking = [
+        {
+            "rank": i + 1,
+            "video_title": (v.get("title") or v.get("desc") or "")[:50],
+            "total_engagement": (v.get("digg_count") or 0) + (v.get("comment_count") or 0) + (v.get("share_count") or 0),
+            "digg_count": v.get("digg_count") or 0,
+            "comment_count": v.get("comment_count") or 0,
+            "share_count": v.get("share_count") or 0,
+            "confidence_score": 1.0,
+            "evidence_fields": ["digg_count", "comment_count", "share_count"],
+        }
+        for i, v in enumerate(ranked)
+    ]
+
+    # 3. 发布时间规律
+    hour_counts = Counter()
+    weekday_counts = Counter()
+    weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    for v in videos:
+        ts = v.get("create_time_str") or v.get("create_time")
+        if ts:
+            try:
+                if isinstance(ts, (int, float)):
+                    dt = datetime.fromtimestamp(ts)
+                else:
+                    ts_str = str(ts).replace("Z", "+00:00")
+                    dt = datetime.fromisoformat(ts_str)
+                hour_counts[dt.hour] += 1
+                weekday_counts[weekday_names[dt.weekday()]] += 1
+            except Exception:
+                pass
+    if hour_counts:
+        top_hours = hour_counts.most_common(3)
+        peak_hours = [f"{h:02d}:00-{(h+1)%24:02d}:00" for h, _ in top_hours]
+        posting_pattern = {
+            "peak_hours": peak_hours,
+            "weekday_distribution": dict(weekday_counts),
+            "confidence_score": 1.0,
+            "evidence_fields": ["create_time"],
+            "status": "数据充足已计算",
+        }
+    else:
+        posting_pattern = {"peak_hours": [], "weekday_distribution": {}, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["create_time"]}
+
+    # 4. 点赞评论比
+    ratios = []
+    for v in videos:
+        digg = v.get("digg_count") or 0
+        comment = v.get("comment_count") or 0
+        if comment > 0:
+            ratios.append(digg / comment)
+    if ratios:
+        ratio_data = {
+            "average_ratio": round(sum(ratios) / len(ratios), 2),
+            "min_ratio": round(min(ratios), 2),
+            "max_ratio": round(max(ratios), 2),
+            "confidence_score": 1.0,
+            "evidence_fields": ["digg_count", "comment_count"],
+            "status": "数据充足已计算",
+        }
+    else:
+        ratio_data = {"average_ratio": None, "min_ratio": None, "max_ratio": None, "confidence_score": None, "status": "数据不足，无法判断", "evidence_fields": ["digg_count", "comment_count"]}
+
+    # 5. 高表现内容类型 (简单关键词分类)
+    type_keywords = {
+        "美食/饮食": ["美食", "吃", "餐", "味", "食", "饮", "菜", "厨"],
+        "健康/养生": ["健康", "养生", "运动", "健身", "跑步", "医疗"],
+        "旅游/风景": ["旅游", "风景", "旅行", "打卡", "景点", "出游"],
+        "新闻/资讯": ["新闻", "报道", "消息", "快讯", "最新", "突发"],
+        "生活/日常": ["生活", "日常", "日常", "记录", "分享"],
+        "文化/传统": ["文化", "传统", "历史", "非遗", "民俗", "龙舟", "龙船"],
+        "天气/灾害": ["天气", "台风", "暴雨", "高温", "寒潮", "预警"],
+        "科技/数码": ["科技", "数码", "手机", "AI", "智能", "技术"],
+    }
+    type_stats = {}
+    for v in videos:
+        title = (v.get("title") or v.get("desc") or "")
+        engagement = (v.get("digg_count") or 0) + (v.get("comment_count") or 0) + (v.get("share_count") or 0)
+        matched = False
+        for ctype, keywords in type_keywords.items():
+            if any(kw in title for kw in keywords):
+                if ctype not in type_stats:
+                    type_stats[ctype] = {"count": 0, "total_engagement": 0}
+                type_stats[ctype]["count"] += 1
+                type_stats[ctype]["total_engagement"] += engagement
+                matched = True
+                break
+        if not matched:
+            if "其他" not in type_stats:
+                type_stats["其他"] = {"count": 0, "total_engagement": 0}
+            type_stats["其他"]["count"] += 1
+            type_stats["其他"]["total_engagement"] += engagement
+    top_content_types = [
+        {
+            "content_type": ctype,
+            "video_count": s["count"],
+            "avg_engagement": round(s["total_engagement"] / s["count"], 1) if s["count"] else 0,
+            "confidence_score": 0.8,
+            "evidence_fields": ["title", "digg_count"],
+        }
+        for ctype, s in sorted(type_stats.items(), key=lambda x: x[1]["total_engagement"], reverse=True)
+    ]
+
+    return {
+        "high_frequency_keywords": high_freq,
+        "engagement_ranking": engagement_ranking,
+        "posting_time_pattern": posting_pattern,
+        "like_comment_ratio": ratio_data,
+        "top_content_types": top_content_types,
+    }
+
+
+def _generate_insights(stats: dict, account_fields: dict | None, account_name: str = "") -> list[dict]:
+    """调用 AI 生成 actionable_insights (只传统计摘要, 大幅减少 prompt 体积)"""
+    from ai_service import _get_configs, _parse_json
+
+    configs = _get_configs()
+    if not configs:
+        return [{"insight": "无可用 AI 配置", "confidence_score": None, "evidence_fields": [], "supporting_data": ""}]
+
+    stats_json = json.dumps(stats, ensure_ascii=False, indent=2)
+    account_json = json.dumps(account_fields, ensure_ascii=False) if account_fields else "无"
+
+    prompt = f"""基于以下预计算的统计数据, 生成 3-5 条 actionable insights。
+每条 insight 必须引用具体数值, 禁止推测或编造。
+
+【账号】{account_name}
+【账号字段】{account_json}
+【统计数据】
+{stats_json}
+
+以 JSON 对象输出, 格式:
+{{"insights": [{{"insight": "结论", "confidence_score": 0.9, "evidence_fields": ["字段名"], "supporting_data": "引用的具体数值"}}]}}
+"""
+
+    for cfg in configs:
+        provider = cfg["provider"]
+        try:
+            if provider == "claude":
+                from anthropic import Anthropic
+                ac = Anthropic(api_key=cfg["api_key"])
+                msg = ac.messages.create(
+                    model=cfg["model"], max_tokens=1500,
+                    system="你是数据分析师。只输出JSON数组, 不要额外文字。",
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                text = msg.content[0].text
+            else:
+                base_url = cfg["base_url"]
+                url = f"{base_url}/chat/completions"
+                headers = {"Authorization": f"Bearer {cfg['api_key']}", "Content-Type": "application/json"}
+                payload = {
+                    "model": cfg["model"],
+                    "messages": [
+                        {"role": "system", "content": "你是数据分析师。只输出JSON数组, 不要额外文字。"},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.1,
+                    "response_format": {"type": "json_object"},
+                }
+                with httpx.Client(timeout=httpx.Timeout(60.0, connect=10.0)) as client:
+                    resp = client.post(url, headers=headers, json=payload)
+                    resp.raise_for_status()
+                    data = resp.json()
+                text = data["choices"][0]["message"]["content"]
+            result = _parse_json(text)
+            # 确保 result 是列表
+            if isinstance(result, dict) and "insights" in result:
+                result = result["insights"]
+            if not isinstance(result, list):
+                result = [result]
+            return result
+        except Exception as e:
+            print(f"[InsightsGen] {cfg['label']} 失败: {e}")
+            continue
+
+    return [{"insight": "AI 分析失败, 请检查配置", "confidence_score": None, "evidence_fields": [], "supporting_data": ""}]
+
+
 def run_pattern_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
     """PatternAgent: 内容模式识别 (~20s)"""
     va = get_video_analysis(video_analysis_id)
@@ -155,7 +375,7 @@ def run_pattern_analysis(video_analysis_id: str, use_rag: bool = True) -> dict:
 
 
 def run_growth_analysis(video_analysis_id: str) -> dict:
-    """Evidence-based Analysis (~40s, 优化数据量避免超时)"""
+    """Evidence-based Analysis (~15s, 统计预计算 + AI 只生成洞察)"""
     va = get_video_analysis(video_analysis_id)
     if not va:
         raise ValueError(f"视频分析记录不存在: {video_analysis_id}")
@@ -166,43 +386,51 @@ def run_growth_analysis(video_analysis_id: str) -> dict:
     account_name = va.get("account_name") or ""
     competitor_id = va.get("competitor_id")
 
-    # 优化: 截断 account_info 到 500 字符, 视频取互动量前 10 条
-    account_info_trimmed = account_info[:500] if len(account_info) > 500 else account_info
-    top_videos = sorted(
-        videos,
-        key=lambda v: (v.get("digg_count") or 0) + (v.get("comment_count") or 0) + (v.get("share_count") or 0),
-        reverse=True,
-    )[:10]
+    # 1. Python 预计算统计分析 (秒级, 无需 AI)
+    aggregate = _compute_aggregate_analysis(videos, account_fields)
 
-    analysis = None
+    # 2. AI 只生成 actionable_insights (小 prompt, ~10s)
+    insights = _generate_insights(aggregate, account_fields, account_name)
+
+    # 3. 合并结果
+    analysis = {
+        "data_completeness": "full" if videos else "partial",
+        "raw_data_summary": {
+            "has_account_info": bool(account_info.strip()),
+            "has_video_data": bool(videos),
+            "video_count": len(videos),
+            "available_video_fields": list(videos[0].keys()) if videos else [],
+            "missing_video_fields": [],
+        },
+        "aggregate_analysis": aggregate,
+        "actionable_insights": insights,
+        "ai_provider": "deepseek",
+    }
+
     try:
-        from ai_service import growth_analyze
-        analysis = growth_analyze(account_info_trimmed, top_videos, account_fields)
         update_video_analysis(video_analysis_id, {
             "analysis": analysis,
-            "ai_provider": analysis.get("ai_provider", "none"),
+            "ai_provider": "deepseek",
         })
     except Exception as e:
-        print(f"[intelligence] Evidence-based Analysis 失败: {e}")
-        analysis = {"error": str(e), "ai_provider": "none"}
+        print(f"[intelligence] 更新分析结果失败: {e}")
 
     try:
-        if analysis.get("ai_provider") != "none":
-            summary = analysis.get("summary") or json.dumps(analysis, ensure_ascii=False)[:500]
-            get_kb().store_entry(
-                competitor_id=competitor_id,
-                content_type="analysis",
-                title=f"{account_name} - 竞争情报分析",
-                content=summary,
-                metadata={"analysis_keys": list(analysis.keys())},
-            )
+        summary = json.dumps(analysis, ensure_ascii=False)[:500]
+        get_kb().store_entry(
+            competitor_id=competitor_id,
+            content_type="analysis",
+            title=f"{account_name} - 竞争情报分析",
+            content=summary,
+            metadata={"analysis_keys": list(analysis.keys())},
+        )
     except Exception as e:
         print(f"[intelligence] RAG 存储失败: {e}")
 
     return {
         "video_analysis_id": video_analysis_id,
         "analysis": analysis,
-        "ai_provider": analysis.get("ai_provider", "none"),
+        "ai_provider": "deepseek",
     }
 
 
