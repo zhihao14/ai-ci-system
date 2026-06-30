@@ -284,16 +284,25 @@ def build_growth_prompt(account_info: str, videos: list[dict] | None = None, acc
         account_field_names = []
         account_fields_json = "无结构化字段 (仅纯文本)"
 
-    # 构造视频数据文本
+    # 构造视频数据文本 — 截断过长内容, 只保留分析必需字段, 限制 20 条
     videos_text = "无视频数据"
     if has_videos:
+        # 按互动量降序取前 20 条, 减少 prompt 体积
+        sorted_videos = sorted(
+            videos,
+            key=lambda v: (v.get("digg_count") or 0) + (v.get("comment_count") or 0) + (v.get("share_count") or 0),
+            reverse=True,
+        )[:20]
         lines = []
-        for i, v in enumerate(videos, 1):
+        for i, v in enumerate(sorted_videos, 1):
+            # 标题/描述截断到 80 字, 避免 prompt 过大导致超时
+            title = (v.get("title") or v.get("desc") or "")[:80]
+            desc = (v.get("desc") or "")[:80]
             lines.append(
-                f"视频{i}: 标题={v.get('title','')} 描述={v.get('desc','')} "
+                f"视频{i}: 标题={title} "
                 f"点赞={v.get('digg_count','')} 评论={v.get('comment_count','')} "
                 f"转发={v.get('share_count','')} 播放={v.get('play_count','')} "
-                f"发布时间={v.get('create_time','')}"
+                f"发布时间={v.get('create_time_str') or v.get('create_time','')}"
             )
         videos_text = "\n".join(lines)
 
@@ -350,7 +359,8 @@ def _openai_compatible_growth(cfg: dict, account_info: str, videos: list[dict] |
         "temperature": 0.1,
         "response_format": {"type": "json_object"},
     }
-    with httpx.Client(timeout=45.0) as client:
+    # 超时 120s: connect 10s + read 110s, 应对大 prompt 的慢响应
+    with httpx.Client(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
         resp = client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()
@@ -389,6 +399,7 @@ def growth_analyze(account_info: str, videos: list[dict] | None = None, account_
             "ai_provider": "none",
         }
 
+    errors = []
     for cfg in configs:
         provider = cfg["provider"]
         try:
@@ -400,10 +411,13 @@ def growth_analyze(account_info: str, videos: list[dict] | None = None, account_
             print(f"[ai_service] 增长策略分析成功, 使用: {cfg['label']}")
             return result
         except Exception as e:
-            print(f"[ai_service] {cfg['label']} 增长分析失败, 尝试下一个: {e}")
+            error_msg = f"{cfg['label']}: {type(e).__name__}: {str(e)}"
+            errors.append(error_msg)
+            print(f"[ai_service] {cfg['label']} 增长分析失败, 尝试下一个: {error_msg}")
             continue
 
+    error_detail = "; ".join(errors) if errors else "未知错误"
     return {
-        "error": "所有 AI 供应商均不可用, 请检查配置",
+        "error": f"所有 AI 供应商均不可用, 请检查配置。详细错误: {error_detail}",
         "ai_provider": "none",
     }
