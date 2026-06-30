@@ -59,6 +59,12 @@ class AgentContext:
     # Analysis Agent 产出
     analysis_result: dict = field(default_factory=dict)
 
+    # Pattern Agent 产出
+    pattern_result: dict = field(default_factory=dict)
+
+    # Comparison Agent 产出
+    comparison_result: dict = field(default_factory=dict)
+
     # Strategy Agent 产出
     strategy_result: dict = field(default_factory=dict)
 

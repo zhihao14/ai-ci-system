@@ -341,3 +341,114 @@ def remove_config(config_id: str):
     if not ok:
         raise HTTPException(status_code=404, detail="配置不存在")
     return {"status": "deleted"}
+
+
+# ============================================================
+# AI Competitive Intelligence Platform — 核心智能分析
+# ============================================================
+
+@app.post("/api/intelligence/crawl")
+def intelligence_crawl(req: GrowthAnalysisRequest):
+    """第1步: 爬取50条视频, 存入 video_analyses 表 (~20s)"""
+    from intelligence_service import crawl_and_save
+    try:
+        result = crawl_and_save(req.url.strip())
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/intelligence/analyze")
+def intelligence_analyze(req: dict):
+    """第2步: Multi-Agent 分析 (Pattern + Analysis + Trend) (~40s)"""
+    from intelligence_service import run_analysis
+    analysis_id = req.get("video_analysis_id")
+    use_rag = req.get("use_rag", True)
+    if not analysis_id:
+        raise HTTPException(status_code=422, detail="video_analysis_id 必填")
+    try:
+        result = run_analysis(analysis_id, use_rag)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/intelligence/strategy")
+def intelligence_strategy(req: dict):
+    """第3步: Growth Strategy Recommendation Engine (~20s)"""
+    from intelligence_service import generate_strategy
+    analysis_id = req.get("video_analysis_id")
+    use_rag = req.get("use_rag", True)
+    if not analysis_id:
+        raise HTTPException(status_code=422, detail="video_analysis_id 必填")
+    try:
+        result = generate_strategy(analysis_id, use_rag)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/intelligence/compare")
+def intelligence_compare(req: dict):
+    """Multi Competitor Comparison Engine (~20s)"""
+    from intelligence_service import compare_competitors
+    analysis_ids = req.get("analysis_ids", [])
+    if len(analysis_ids) < 2:
+        raise HTTPException(status_code=422, detail="至少需要 2 个 analysis_id")
+    try:
+        result = compare_competitors(analysis_ids)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/intelligence/knowledge/search")
+def knowledge_search(req: dict):
+    """RAG 知识库搜索 (~2s)"""
+    from rag.knowledge_base import get_kb
+    query = req.get("query", "")
+    limit = req.get("limit", 5)
+    if not query:
+        raise HTTPException(status_code=422, detail="query 必填")
+    results = get_kb().search(query, limit=limit)
+    return {"results": results, "count": len(results)}
+
+
+@app.get("/api/intelligence/analyses")
+def intelligence_list(limit: int = 20):
+    """列出所有智能分析记录"""
+    from db_intelligence import list_video_analyses
+    return list_video_analyses(limit=limit)
+
+
+@app.get("/api/intelligence/analyses/{analysis_id}")
+def intelligence_detail(analysis_id: str):
+    """获取完整分析详情 (含 videos + patterns + trends + strategy)"""
+    from db_intelligence import get_video_analysis, get_content_pattern, get_trend_prediction, get_growth_strategy
+    va = get_video_analysis(analysis_id)
+    if not va:
+        raise HTTPException(status_code=404, detail="分析记录不存在")
+    patterns = get_content_pattern(analysis_id)
+    trends = get_trend_prediction(analysis_id)
+    strategy = get_growth_strategy(analysis_id)
+    return {
+        **va,
+        "patterns": patterns.get("patterns") if patterns else None,
+        "trends": trends.get("predictions") if trends else None,
+        "strategy": strategy.get("strategy") if strategy else None,
+    }
+
+
+@app.get("/api/intelligence/dashboard")
+def intelligence_dashboard():
+    """Real-time Analytics Dashboard 统计数据"""
+    from intelligence_service import get_intelligence_dashboard
+    return get_intelligence_dashboard()

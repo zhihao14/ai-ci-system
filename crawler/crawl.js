@@ -155,7 +155,7 @@ async function crawlDouyinVideos(shareUrl) {
 
   // 5. 在页面 context 内 fetch 视频列表 API
   const allVideos = [];
-  const TARGET_VIDEO_COUNT = 20;
+  const TARGET_VIDEO_COUNT = 50;
   let maxCursor = 0;
   let hasMore = true;
   let pageCount = 0;

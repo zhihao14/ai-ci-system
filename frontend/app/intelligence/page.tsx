@@ -1,0 +1,394 @@
+"use client";
+
+// intelligence/page.tsx — 核心智能分析: Crawl → Analyze → Strategy 三步流程
+import { useState } from "react";
+import { Items, ObjectView, SectionCard } from "@/components/result-display";
+
+// ---- 类型 ----
+interface VideoItem {
+  aweme_id?: string;
+  title?: string;
+  desc?: string;
+  digg_count?: number | null;
+  comment_count?: number | null;
+  share_count?: number | null;
+  create_time_str?: string | null;
+  [k: string]: unknown;
+}
+
+interface CrawlResult {
+  video_analysis_id: string;
+  account_name?: string;
+  url?: string;
+  videos?: VideoItem[];
+  video_count?: number;
+  [k: string]: unknown;
+}
+
+interface AnalyzeResult {
+  patterns?: {
+    topic_clusters?: unknown[];
+    content_format_analysis?: unknown[];
+    posting_cadence?: Record<string, unknown>;
+    engagement_patterns?: Record<string, unknown>;
+  };
+  analysis?: {
+    aggregate_analysis?: {
+      high_frequency_keywords?: unknown[];
+      engagement_ranking?: unknown[];
+      like_comment_ratio?: Record<string, unknown>;
+      posting_time_pattern?: Record<string, unknown>;
+      top_content_types?: unknown[];
+    };
+    actionable_insights?: unknown[];
+  };
+  trends?: {
+    content_trends?: { rising?: unknown[]; falling?: unknown[]; stable?: unknown[] };
+    engagement_forecast?: Record<string, unknown>;
+    growth_trajectory?: Record<string, unknown>;
+  };
+  ai_provider?: string;
+}
+
+interface StrategyResult {
+  strategy?: {
+    short_term_actions?: unknown[];
+    mid_term_strategy?: unknown[];
+    content_calendar?: unknown[];
+    kpi_targets?: unknown[];
+  };
+  ai_provider?: string;
+}
+
+const STEPS = ["Crawl", "Analyze", "Strategy"];
+
+export default function IntelligencePage() {
+  const [url, setUrl] = useState("");
+  const [step, setStep] = useState(0);
+  const [loading, setLoading] = useState<1 | 2 | 3 | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [crawl, setCrawl] = useState<CrawlResult | null>(null);
+  const [analyze, setAnalyze] = useState<AnalyzeResult | null>(null);
+  const [strategy, setStrategy] = useState<StrategyResult | null>(null);
+
+  const api = async (path: string, body: unknown) => {
+    const res = await fetch(`/api/intelligence/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const msg = await res.json().catch(() => ({}));
+      throw new Error(msg.detail || `请求失败 (${res.status})`);
+    }
+    return res.json();
+  };
+
+  const runStep = async (
+    n: 1 | 2 | 3,
+    path: string,
+    body: unknown,
+    onOk: (d: unknown) => void
+  ) => {
+    setLoading(n);
+    setError(null);
+    try {
+      onOk(await api(path, body));
+      setStep(n);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "未知错误");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleCrawl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!url) return;
+    setCrawl(null);
+    setAnalyze(null);
+    setStrategy(null);
+    setStep(0);
+    runStep(1, "crawl", { url }, (d) => setCrawl(d as CrawlResult));
+  };
+
+  const handleAnalyze = () => {
+    if (!crawl?.video_analysis_id) return;
+    runStep(2, "analyze", { video_analysis_id: crawl.video_analysis_id }, (d) =>
+      setAnalyze(d as AnalyzeResult)
+    );
+  };
+
+  const handleStrategy = () => {
+    if (!crawl?.video_analysis_id) return;
+    runStep(3, "strategy", { video_analysis_id: crawl.video_analysis_id }, (d) =>
+      setStrategy(d as StrategyResult)
+    );
+  };
+
+  const trends = analyze?.trends?.content_trends;
+  const trendGroup = (label: string, items: unknown[] | undefined, color: string) =>
+    items && items.length > 0 ? (
+      <div>
+        <p className={`mb-2 text-xs font-semibold ${color}`}>{label}</p>
+        <Items items={items} />
+      </div>
+    ) : null;
+
+  const providerBadge = (p?: string) => (
+    <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+      {p || "AI"}
+    </span>
+  );
+  const primaryBtn = (
+    label: string,
+    loadingLabel: string,
+    n: 1 | 2 | 3,
+    onClick: () => void
+  ) => (
+    <button
+      onClick={onClick}
+      disabled={loading === n}
+      className="mt-5 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+    >
+      {loading === n ? loadingLabel : label}
+    </button>
+  );
+
+  return (
+    <div>
+      <header className="mb-8">
+        <h1 className="text-2xl font-bold text-slate-900">智能分析</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          爬取抖音账号视频 → AI 模式分析 → 生成竞争策略 · 每条结论附置信度与证据字段
+        </p>
+      </header>
+
+      {/* 步骤进度条 */}
+      <div className="mb-6 flex items-center gap-2">
+        {STEPS.map((s, i) => {
+          const idx = i + 1;
+          const done = step >= idx;
+          const active = loading === idx;
+          return (
+            <div key={s} className="flex flex-1 items-center gap-2">
+              <div
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  done
+                    ? "bg-indigo-600 text-white"
+                    : active
+                    ? "animate-pulse bg-indigo-200 text-indigo-700"
+                    : "bg-slate-200 text-slate-500"
+                }`}
+              >
+                {idx}
+              </div>
+              <p className={`text-sm font-medium ${done || active ? "text-slate-900" : "text-slate-400"}`}>
+                {s}
+              </p>
+              {i < STEPS.length - 1 && (
+                <div className={`mx-1 h-0.5 flex-1 ${step > idx ? "bg-indigo-600" : "bg-slate-200"}`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 输入表单 (Step 1: Crawl) */}
+      <form
+        onSubmit={handleCrawl}
+        className="mb-6 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-[1fr_auto]"
+      >
+        <input
+          type="text"
+          required
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="粘贴抖音账号分享链接"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+        />
+        <button
+          type="submit"
+          disabled={loading === 1}
+          className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {loading === 1 ? "爬取中..." : "开始爬取"}
+        </button>
+      </form>
+
+      {error && (
+        <div className="mb-6 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+      )}
+
+      {/* Step 1 结果: 爬取数据 */}
+      {crawl && (
+        <div className="mb-6 space-y-6">
+          <SectionCard
+            title="爬取结果"
+            right={
+              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                {crawl.video_count ?? 0} 条视频
+              </span>
+            }
+          >
+            <p className="mb-4 text-sm text-slate-600">
+              账号: <span className="font-medium text-slate-900">{crawl.account_name || "—"}</span>
+              {crawl.url && (
+                <>
+                  {" · "}
+                  <a href={crawl.url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                    原链接
+                  </a>
+                </>
+              )}
+            </p>
+            {crawl.videos && crawl.videos.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs text-slate-400">
+                      <th className="pb-2 pr-3 text-left font-medium">#</th>
+                      <th className="pb-2 pr-3 text-left font-medium">标题</th>
+                      <th className="pb-2 pr-3 text-right font-medium">点赞</th>
+                      <th className="pb-2 pr-3 text-right font-medium">评论</th>
+                      <th className="pb-2 pr-3 text-right font-medium">转发</th>
+                      <th className="pb-2 text-left font-medium">发布时间</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {crawl.videos.slice(0, 10).map((v, i) => (
+                      <tr key={v.aweme_id || i} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="py-2 pr-3 text-slate-400">{i + 1}</td>
+                        <td className="max-w-xs truncate py-2 pr-3 text-slate-600">
+                          {v.title || v.desc || "—"}
+                        </td>
+                        <td className="py-2 pr-3 text-right text-slate-600">{v.digg_count?.toLocaleString() ?? "—"}</td>
+                        <td className="py-2 pr-3 text-right text-slate-600">{v.comment_count?.toLocaleString() ?? "—"}</td>
+                        <td className="py-2 pr-3 text-right text-slate-600">{v.share_count?.toLocaleString() ?? "—"}</td>
+                        <td className="py-2 text-xs text-slate-500">
+                          {v.create_time_str ? new Date(v.create_time_str).toLocaleString("zh-CN") : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">未获取到视频列表</p>
+            )}
+            {primaryBtn("Step 2: AI 模式分析", "分析中...", 2, handleAnalyze)}
+          </SectionCard>
+        </div>
+      )}
+
+      {/* Step 2 结果: patterns + analysis + trends */}
+      {analyze && (
+        <div className="mb-6 space-y-6">
+          <SectionCard title="内容模式 (Patterns)" right={providerBadge(analyze.ai_provider)}>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">主题聚类</h3>
+                <Items items={analyze.patterns?.topic_clusters} />
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">内容格式分析</h3>
+                <Items items={analyze.patterns?.content_format_analysis} />
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">发布节奏</h3>
+                <ObjectView obj={analyze.patterns?.posting_cadence} />
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">互动模式</h3>
+                <ObjectView obj={analyze.patterns?.engagement_patterns} />
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Evidence-based 分析">
+            <div className="space-y-5">
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">高频关键词</h3>
+                <Items items={analyze.analysis?.aggregate_analysis?.high_frequency_keywords} />
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">互动量排序</h3>
+                <Items items={analyze.analysis?.aggregate_analysis?.engagement_ranking} />
+              </div>
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">点赞评论比</h3>
+                  <ObjectView obj={analyze.analysis?.aggregate_analysis?.like_comment_ratio} />
+                </div>
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">发布时间规律</h3>
+                  <ObjectView obj={analyze.analysis?.aggregate_analysis?.posting_time_pattern} />
+                </div>
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">高表现内容类型</h3>
+                <Items items={analyze.analysis?.aggregate_analysis?.top_content_types} />
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">数据驱动结论</h3>
+                <Items items={analyze.analysis?.actionable_insights} />
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="趋势预测 (Trends)">
+            <div className="space-y-5">
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">内容趋势</h3>
+                {trends && (trends.rising || trends.falling || trends.stable) ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    {trendGroup("上升 ↑", trends.rising, "text-emerald-600")}
+                    {trendGroup("下降 ↓", trends.falling, "text-rose-600")}
+                    {trendGroup("稳定 →", trends.stable, "text-slate-500")}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">暂无数据</p>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">互动量预测</h3>
+                  <ObjectView obj={analyze.trends?.engagement_forecast} />
+                </div>
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">增长轨迹</h3>
+                  <ObjectView obj={analyze.trends?.growth_trajectory} />
+                </div>
+              </div>
+            </div>
+            {primaryBtn("Step 3: 生成竞争策略", "生成中...", 3, handleStrategy)}
+          </SectionCard>
+        </div>
+      )}
+
+      {/* Step 3 结果: strategy */}
+      {strategy && (
+        <SectionCard title="竞争策略 (Strategy)" right={providerBadge(strategy.ai_provider)}>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">短期行动</h3>
+              <Items items={strategy.strategy?.short_term_actions} />
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">中期策略</h3>
+              <Items items={strategy.strategy?.mid_term_strategy} />
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">内容日历</h3>
+              <Items items={strategy.strategy?.content_calendar} />
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">KPI 目标</h3>
+              <Items items={strategy.strategy?.kpi_targets} />
+            </div>
+          </div>
+        </SectionCard>
+      )}
+    </div>
+  );
+}
