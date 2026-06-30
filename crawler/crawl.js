@@ -145,9 +145,9 @@ async function crawlDouyinVideos(shareUrl) {
   try {
     await page.goto("https://www.douyin.com/", {
       waitUntil: "domcontentloaded",
-      timeout: 15000,
+      timeout: 10000,
     });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
     console.error(`[crawler] 首页加载完成`);
   } catch (e) {
     console.error(`[crawler] 预访问首页失败, 继续: ${e.message}`);
@@ -159,9 +159,9 @@ async function crawlDouyinVideos(shareUrl) {
   try {
     await page.goto(profileUrl, {
       waitUntil: "domcontentloaded",
-      timeout: 20000,
+      timeout: 15000,
     });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
   } catch (e) {
     console.error(`[crawler] 用户主页导航超时, 继续尝试: ${e.message}`);
   }
