@@ -584,7 +584,7 @@ export default function DashboardHomePage() {
                               {t("dashboard.target")}: {s.target_weakness}
                             </span>
                             <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500">
-                              {t("dashboard.timeline")}: {s.timeline}
+                              {t("dashboard.timeline")}: {t(`dashboard.timeline_${s.timeline}`, ) || s.timeline}
                             </span>
                             <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500">
                               {t("dashboard.impactLabel")}: {s.expected_impact}

@@ -268,21 +268,21 @@ def generate_executive_summary(video_analysis_id: str) -> dict:
 
     brief_json = json.dumps(brief, ensure_ascii=False, indent=2)
 
-    prompt = f"""You are a competitive intelligence analyst. Write an executive summary for this competitor.
+    prompt = f"""你是一名竞争情报分析师。请为以下竞争对手撰写高管摘要。
 
-Data brief:
+数据简报:
 {brief_json}
 
-Write a concise executive summary (3-4 sentences, max 200 words). Cover:
-1. Who they are and their market position
-2. Key strength (highest scoring dimension)
-3. Key threat or weakness (lowest scoring dimension)
-4. Strategic recommendation in one sentence
+请撰写简洁的高管摘要（3-4句话，最多200字）。内容覆盖：
+1. 他们是谁以及市场地位
+2. 关键优势（最高得分维度）
+3. 关键威胁或弱点（最低得分维度）
+4. 一句话战略建议
 
-Also extract 3 key metrics as bullet points.
+同时提取3个关键指标作为要点。
 
-Output as JSON:
-{{"headline": "one-line headline (max 80 chars)", "summary": "3-4 sentence executive summary", "key_metrics": ["metric 1", "metric 2", "metric 3"], "recommendation": "one sentence strategic recommendation"}}
+以 JSON 格式输出:
+{{"headline": "一行标题（最多80字）", "summary": "3-4句高管摘要", "key_metrics": ["指标1", "指标2", "指标3"], "recommendation": "一句话战略建议"}}
 """
 
     for cfg in configs:
@@ -293,7 +293,7 @@ Output as JSON:
                 ac = Anthropic(api_key=cfg["api_key"])
                 msg = ac.messages.create(
                     model=cfg["model"], max_tokens=1000,
-                    system="You are a competitive intelligence analyst. Output only JSON.",
+                    system="你是一名竞争情报分析师。只输出JSON，用中文撰写。",
                     messages=[{"role": "user", "content": prompt}],
                 )
                 text = msg.content[0].text
@@ -304,7 +304,7 @@ Output as JSON:
                 payload = {
                     "model": cfg["model"],
                     "messages": [
-                        {"role": "system", "content": "You are a competitive intelligence analyst. Output only JSON."},
+                        {"role": "system", "content": "你是一名竞争情报分析师。只输出JSON，用中文撰写。"},
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.2,
@@ -341,9 +341,9 @@ Output as JSON:
 
 def _fallback_summary(brief: dict) -> str:
     return (
-        f"{brief['account']} has {brief['followers']} followers across {brief['video_count']} videos. "
-        f"Average engagement: {brief['avg_engagement']}. "
-        f"Competitor score: {brief['competitor_score']}/100 (Grade: {brief['grade']})."
+        f"{brief['account']} 拥有 {brief['followers']} 粉丝，共 {brief['video_count']} 条视频。"
+        f"平均互动量: {brief['avg_engagement']}。"
+        f"竞争者评分: {brief['competitor_score']}/100（等级: {brief['grade']}）。"
     )
 
 
@@ -386,8 +386,8 @@ def detect_threats(video_analysis_id: str) -> dict:
             threats.append({
                 "type": "viral_content",
                 "severity": "high" if share_ratio > 1.0 else "medium",
-                "title": f"Viral Share Dominance",
-                "description": f"Share-to-like ratio of {share_ratio:.2f} indicates content is being heavily shared, creating viral reach beyond their follower base.",
+                "title": f"病毒式传播优势",
+                "description": f"转发与点赞比率达 {share_ratio:.2f}，表明内容被大量转发，形成了超出粉丝基数的病毒式传播。",
                 "evidence": f"total_shares={total_shares}, total_likes={total_likes}",
                 "confidence_score": 0.9,
                 "impact": "high",
@@ -410,8 +410,8 @@ def detect_threats(video_analysis_id: str) -> dict:
             threats.append({
                 "type": "engagement_spike",
                 "severity": "high" if spike_ratio > 5 else "medium",
-                "title": f"Engagement Spike ({spike_ratio:.1f}x average)",
-                "description": f"Top video has {top_engagement} total engagement, {spike_ratio:.1f}x the account average. This content type may be replicable.",
+                "title": f"互动量激增（{spike_ratio:.1f}倍于均值）",
+                "description": f"最高互动视频总互动量达 {top_engagement}，是账号平均值的 {spike_ratio:.1f} 倍。该内容模式可能具有可复制性。",
                 "evidence": f"top_video_engagement={top_engagement}, avg={avg_engagement:.0f}",
                 "confidence_score": 0.85,
                 "impact": "high",
@@ -422,8 +422,8 @@ def detect_threats(video_analysis_id: str) -> dict:
         threats.append({
             "type": "content_velocity",
             "severity": "medium",
-            "title": f"High Content Velocity ({len(videos)} videos)",
-            "description": f"Account maintains high posting frequency with {len(videos)} recent videos, indicating aggressive content production pipeline.",
+            "title": f"高内容产出速度（{len(videos)}条视频）",
+            "description": f"该账号保持高频率发布，近期有 {len(videos)} 条视频，显示出积极的内容生产管线。",
             "evidence": f"video_count={len(videos)}",
             "confidence_score": 0.8,
             "impact": "medium",
@@ -437,8 +437,8 @@ def detect_threats(video_analysis_id: str) -> dict:
             threats.append({
                 "type": "engagement_efficiency",
                 "severity": "high" if efficiency > 1000 else "medium",
-                "title": f"High Engagement Efficiency ({efficiency:.0f}/10K followers)",
-                "description": f"Average engagement of {avg_engagement:.0f} with {follower_count} followers shows exceptionally efficient content.",
+                "title": f"高互动效率（每万粉丝 {efficiency:.0f} 互动）",
+                "description": f"平均互动量 {avg_engagement:.0f}，粉丝数仅 {follower_count}，显示出极高的内容转化效率。",
                 "evidence": f"avg_engagement={avg_engagement:.0f}, followers={follower_count}",
                 "confidence_score": 0.75,
                 "impact": "high",
@@ -450,8 +450,8 @@ def detect_threats(video_analysis_id: str) -> dict:
         threats.append({
             "type": "consistent_threat",
             "severity": "medium",
-            "title": f"Consistent Posting Strategy",
-            "description": f"Posting at consistent times (score: {consistency}/100) indicates disciplined content calendar that competitors may struggle to match.",
+            "title": f"稳定的发布策略",
+            "description": f"发布时间高度一致（评分: {consistency}/100），表明有纪律性的内容日历，竞争对手可能难以匹敌。",
             "evidence": f"consistency_score={consistency}",
             "confidence_score": 0.7,
             "impact": "medium",
@@ -538,28 +538,28 @@ def generate_counter_strategy(video_analysis_id: str) -> dict:
 
     brief_json = json.dumps(brief, ensure_ascii=False, indent=2)
 
-    prompt = f"""You are a competitive strategy advisor. Generate counter-strategies to beat this competitor.
+    prompt = f"""你是一名竞争策略顾问。请针对以下竞争对手生成反制策略。
 
-Competitor intelligence brief:
+竞争对手情报简报:
 {brief_json}
 
-Generate 3-4 counter-strategies that attack their weak dimensions and neutralize their threats.
-Each strategy must include specific, actionable tactics.
+请生成3-4条反制策略，针对其薄弱维度并中和其威胁。
+每条策略必须包含具体、可执行的战术。
 
-Output as JSON:
+以 JSON 格式输出:
 {{
   "counter_strategies": [
     {{
-      "tactic": "short tactic name",
-      "target_weakness": "which dimension/threat to exploit",
-      "action_plan": "2-3 sentence action plan",
+      "tactic": "简短策略名称",
+      "target_weakness": "要利用的维度/威胁",
+      "action_plan": "2-3句话行动方案",
       "timeline": "immediate|1_month|3_months",
-      "expected_impact": "what outcome to expect",
+      "expected_impact": "预期效果",
       "priority": "high|medium|low",
       "confidence_score": 0.8
     }}
   ],
-  "overall_approach": "1 sentence summary of the counter-strategy approach"
+  "overall_approach": "一句话总结反制策略方向"
 }}
 """
 
@@ -571,7 +571,7 @@ Output as JSON:
                 ac = Anthropic(api_key=cfg["api_key"])
                 msg = ac.messages.create(
                     model=cfg["model"], max_tokens=2000,
-                    system="You are a competitive strategy advisor. Output only JSON.",
+                    system="你是一名竞争策略顾问。只输出JSON，用中文撰写。tactic和overall_approach用中文，timeline和priority用英文枚举值。",
                     messages=[{"role": "user", "content": prompt}],
                 )
                 text = msg.content[0].text
@@ -582,7 +582,7 @@ Output as JSON:
                 payload = {
                     "model": cfg["model"],
                     "messages": [
-                        {"role": "system", "content": "You are a competitive strategy advisor. Output only JSON."},
+                        {"role": "system", "content": "你是一名竞争策略顾问。只输出JSON，用中文撰写。tactic和overall_approach用中文，timeline和priority用英文枚举值。"},
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.3,
